@@ -60,11 +60,11 @@ def main(argv=sys.argv[1:]):
         # create visual markers for grasps
         successful_grasps = [
             create_gripper_marker(color=[0, 255, 0]).apply_transform(t)
-            for t in T[np.random.choice(np.where(success == 1)[0], args.num_grasps)]
+            for t in T[np.random.choice(np.where(success == 1)[0], 50)]
         ]
         failed_grasps = [
             create_gripper_marker(color=[255, 0, 0]).apply_transform(t)
-            for t in T[np.random.choice(np.where(success == 0)[0], args.num_grasps)]
+            for t in T[np.random.choice(np.where(success == 0)[0], 50)]
         ]
 
         trimesh.Scene([obj_mesh] + successful_grasps + failed_grasps).show()

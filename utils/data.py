@@ -16,8 +16,8 @@ import glob
 import trimesh.transformations as tra
 from scipy.spatial import cKDTree
 
-import provider
-from scene_renderer import SceneRenderer
+import utils.pointnet_provider as provider
+from utils.graspnet_scene_renderer import SceneRenderer
 
 def load_scene_contacts(dataset_folder, test_split_only=False, num_test=None, scene_contacts_path='scene_contacts_new'):
     """
@@ -676,7 +676,7 @@ class PointCloudReader:
             cad_scale {float} -- scale of CAD model
         """
 
-        self._renderer.change_object(cad_path, cad_scale)
+        self._renderer._load_object(cad_path, cad_scale)
 
     def change_scene(self, obj_paths, obj_scales, obj_transforms, visualize=False):
         """

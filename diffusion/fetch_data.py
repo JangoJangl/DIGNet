@@ -1,6 +1,7 @@
 import os
 import acronym_tools as data
 import numpy as np
+import trimesh
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ACRONYM_DIR = 'dataset/acronym'
@@ -20,26 +21,28 @@ def main():
                 [np.nd.array]?                             -- object meshes
             """
 
+    grasps = {}
     #list all grasping file paths
-    grasps = [os.path.join(BASE_DIR, ACRONYM_DIR, 'grasps', g) for g in os.listdir(os.path.join(BASE_DIR, ACRONYM_DIR, 'grasps'))]
-    for f in grasps:
-        # load object mesh
-        #obj_mesh = data.load_mesh(f, mesh_root_dir=args.mesh_root)
+    grasps['path'] = [os.path.join(BASE_DIR, ACRONYM_DIR, 'grasps', g) for g in os.listdir(os.path.join(BASE_DIR, ACRONYM_DIR, 'grasps'))]
+    grasps['transform'] = []
+    grasps['success'] = []
+    idx = []
+    for i, f in enumerate(grasps['path'][1:1000]):
 
-        # get transformations and quality of all simulated grasps
-        T, success = data.load_grasps(f)
+        try:
+            # load object mesh
+            grasps['obj_mesh'] = data.load_mesh(f, mesh_root_dir=os.path.join(BASE_DIR, ACRONYM_DIR))
+            # get transformations and quality of all simulated grasps
+            t, s = data.load_grasps(f)
+            grasps['transform'].append(t)
+            grasps['success'].append(s)
+        except:
+            idx.append(i)
 
-        # create visual markers for grasps
-        successful_grasps = [
-            data.create_gripper_marker(color=[0, 255, 0]).apply_transform(t)
-            for t in T[np.random.choice(np.where(success == 1)[0], num_grasps)]
-        ]
-        failed_grasps = [
-            data.create_gripper_marker(color=[255, 0, 0]).apply_transform(t)
-            for t in T[np.random.choice(np.where(success == 0)[0], num_grasps)]
-        ]
 
-        #trimesh.Scene([obj_mesh] + successful_grasps + failed_grasps).show()
+    print(idx)
+    print(len(grasps['path']), len(grasps['transform']))
+
 
 if __name__ == "__main__":
     main()

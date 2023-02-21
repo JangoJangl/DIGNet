@@ -14,7 +14,6 @@ from tqdm import tqdm
 import trimesh
 import trimesh.transformations as tra
 
-import tensorflow.compat.v1 as tf
 
 class Object(object):
     """Represents a graspable object."""
@@ -104,7 +103,7 @@ class PandaGripper(object):
         self.contact_ray_directions = []
 
         # coords_path = os.path.join(root_folder, 'gripper_control_points/panda_gripper_coords.npy')
-        with open(os.path.join(root_folder,'gripper_control_points/panda_gripper_coords.pickle'), 'rb') as f:
+        with open(os.path.join(root_folder,'gripper/control_points/panda_gripper_coords.pickle'), 'rb') as f:
             self.finger_coords = pickle.load(f, encoding='latin1')
         finger_direction = self.finger_coords['gripper_right_center_flat'] - self.finger_coords['gripper_left_center_flat']
         self.contact_ray_origins.append(np.r_[self.finger_coords['gripper_left_center_flat'], 1])
@@ -137,7 +136,7 @@ class PandaGripper(object):
         return transform[:3, :].dot(
             self.contact_ray_origins.T).T, transform[:3, :3].dot(self.contact_ray_directions.T).T
         
-    def get_control_point_tensor(self, batch_size, use_tf=True, symmetric = False, convex_hull=True):
+    def get_control_point_tensor(self, batch_size, symmetric=False, convex_hull=True):
         """
         Outputs a 5 point gripper representation of shape (batch_size x 5 x 3).
 
@@ -145,7 +144,6 @@ class PandaGripper(object):
             batch_size {int} -- batch size
 
         Keyword Arguments:
-            use_tf {bool} -- outputing a tf tensor instead of a numpy array (default: {True})
             symmetric {bool} -- Output the symmetric control point configuration of the gripper (default: {False})
             convex_hull {bool} -- Return control points according to the convex hull panda gripper model (default: {True})
 
@@ -165,8 +163,6 @@ class PandaGripper(object):
             control_points[1:3, 2] = 0.0584
         control_points = np.tile(np.expand_dims(control_points, 0), [batch_size, 1, 1])
 
-        if use_tf:
-            return tf.convert_to_tensor(control_points)
 
         return control_points
 

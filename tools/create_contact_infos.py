@@ -9,7 +9,7 @@ import sys
 # sys.path.append(ROOT_DIR)
 
 from utils.data import PointCloudReader
-from utils.mesh_utils import in_collision_with_gripper, grasp_contact_location
+from utils.graspnet_mesh_utils import in_collision_with_gripper, grasp_contact_location
 
 def grasps_contact_info(grasp_tfs, successfuls, obj_mesh, check_collisions=True):
     """
@@ -59,7 +59,7 @@ def read_object_grasp_data_acronym(root_folder, h5_path):
     
     abs_h5_path = os.path.join(root_folder, 'grasps', h5_path)
     data = h5py.File(abs_h5_path, "r")
-    mesh_fname = os.path.join(root_folder, data["object/file"][()])#.decode('utf-8')
+    mesh_fname = os.path.join(root_folder, data["object/file"][()].decode('utf-8'))
     mesh_scale = data["object/scale"][()]
     grasps = np.array(data["grasps/transforms"])
     success = np.array(data["grasps/qualities/flex/object_in_gripper"])
@@ -92,9 +92,13 @@ def save_contact_data(pcreader, grasp_path, target_path='mesh_contacts'):
         return
 
     output_grasps, output_labels, cad_path, cad_scale = read_object_grasp_data_acronym(pcreader._root_folder, grasp_path)
+    
+    # early return if obj path doesn't exist -> error in translating to manifold
+    if not os.path.exists(cad_path):
+        return
     pcreader.change_object(cad_path, cad_scale)
 
-    context = pcreader._renderer._cache[(cad_path,cad_scale)]
+    context = pcreader._renderer._cache[(cad_path, cad_scale)]
     obj_mesh = context['tmesh']
     obj_mesh_mean = context['mesh_mean']
 
