@@ -13,6 +13,7 @@ import pickle
 from tqdm import tqdm
 import trimesh
 import trimesh.transformations as tra
+import open3d as o3d
 
 
 class Object(object):
@@ -25,6 +26,7 @@ class Object(object):
         :param scale: Scaling factor
         """
         self.mesh = trimesh.load(filename)
+        self.mesh_o3d = o3d.io.read_triangle_mesh(filename)
         self.scale = 1.0
 
         # print(filename)
