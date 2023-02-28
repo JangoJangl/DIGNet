@@ -60,3 +60,5 @@ Follow the [Acronym Datset docs](https://github.com/NVlabs/acronym) and replace 
 * --object ../dataset/acronym/grasp
 
 In general notice, that all `data` is moved to `../dataset/acronym`
+
+Note: Just use a implemented model as orientation. You will do it! :)
