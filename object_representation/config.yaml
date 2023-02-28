@@ -1,9 +1,10 @@
 paths:
+  acronym: '/home/i53/student/jandl/repos/Dataset/acronym'
   grasps: '/home/i53/student/jandl/repos/Dataset/acronym/grasps'
   meshes: '/home/i53/student/jandl/repos/Dataset/acronym/meshes'
 
-models: ['Pointnext',
-         'Pc_Mae',
-         'Iae']
+models: ['Pointnext']
+#         'Pc_Mae',
+#         'Iae'
 
 

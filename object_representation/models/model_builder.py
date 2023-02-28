@@ -9,8 +9,9 @@ from .pointnext import Pointnext
 def build_models(model_name_list):
     models = []
     for model_name in model_name_list:
-        if model_name in inspect.getmembers(sys.modules[__name__]):  # check if model_name exists in model classes
-            models.push(eval(model_name + '()'))
+        a =inspect.getmembers(sys.modules[__name__])
+        if model_name in [n[0] for n in inspect.getmembers(sys.modules[__name__])]:  # check if model_name exists in model classes
+            models.append(eval(model_name + '()'))
         else:
             raise BaseException('model_name cannot be instanciated')
 
