@@ -3,7 +3,7 @@ paths:
   grasps: '/home/i53/student/jandl/repos/Dataset/acronym/grasps'
   meshes: '/home/i53/student/jandl/repos/Dataset/acronym/meshes'
 
-models: ['Pointnext']
+models: ['Pc_Mae']
 #         'Pc_Mae',
 #         'Iae'
 

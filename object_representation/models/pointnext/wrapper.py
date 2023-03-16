@@ -2,7 +2,7 @@ import torch
 
 from ..interface import FeatureExtractor
 from object_representation.openpoints.utils import EasyConfig
-from object_representation.openpoints.models import build_model_from_cfg
+from object_representation.openpoints.models.build import build_model_from_cfg
 from object_representation.openpoints.utils import load_checkpoint
 
 class Pointnext(FeatureExtractor):

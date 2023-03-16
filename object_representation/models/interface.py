@@ -7,7 +7,9 @@ using this interface.
 
 import torch
 import object_representation.openpoints.transforms.point_transformer_gpu as transforms
-from helper import Visualizer
+from helper.sampler import Sampler
+from helper.visualize import Visualizer
+
 
 
 class FeatureExtractor(object):
@@ -17,6 +19,7 @@ class FeatureExtractor(object):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.type = torch.float
         self.obj = None
+        self.num_points = None
         self.pc = {}
         self.transforms = []
 
@@ -40,9 +43,7 @@ class FeatureExtractor(object):
         self.obj = obj
 
     def _obj2pc(self):
-        self.pc['pos'] = torch.tensor(self.obj.mesh.vertices, dtype=self.type, device=self.device)
-        self.pc['colors'] = torch.tensor(self.obj.mesh.visual.vertex_colors, dtype=self.type,
-                                         device=self.device)[:, 0:3]/255
+        self.pc = Sampler.vertex_sample(self.obj, self.device)
 
     def _transform(self):
         Visualizer.o3d_tensor(self.pc)

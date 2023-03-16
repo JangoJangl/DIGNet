@@ -33,6 +33,7 @@ You have to create a new folder and wit the following structure.
 Encoder-Name
 ├── cfgs
 ├── checkpoints
+├── model
 ├── wrapper.py
 ├── misc # when needed
 ```
@@ -41,5 +42,6 @@ In checkpoints are the checkpoint.pth saved for your encoder.
 The wrapper.py implements a Class which deals with your model. The parent class is implemented in inference.py
 It is important to implement all passed methods. Furthermore the Name of the Class in wrapper.py has to match the name 
 in [config.yaml](config.yaml).
+The model in the model folder have to be registered via the MODEL.register_module() decorator.
 In misc you can put all mandatory files for you need for instanciating the Encode-model.
 

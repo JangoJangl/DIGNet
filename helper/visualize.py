@@ -5,6 +5,7 @@ import copy
 import numpy as np
 from alr_sim.utils.geometric_transformation import quat2mat
 
+
 class Visualizer(object):
 
     # Todo: Adding trimesh visualization after upgrading python from 3.7.16 to 3.8+
@@ -117,6 +118,3 @@ class Visualizer(object):
     @staticmethod
     def __create_cos(scale, center):
         return o3d.geometry.TriangleMesh.create_coordinate_frame().scale(scale, center=center)
-
-
-
