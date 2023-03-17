@@ -98,4 +98,4 @@ if __name__ == "__main__":
         # visualize_mesh_o3d(obj.mesh.as_open3d)
         if obj is not None:
             embeddings = extract_features(obj, models)
-            save_dataset(grasp_hdf5_path, embeddings)
+            # save_dataset(grasp_hdf5_path, embeddings)

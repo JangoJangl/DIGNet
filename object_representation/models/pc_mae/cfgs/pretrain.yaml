@@ -45,4 +45,7 @@ max_epoch : 300
 
 
 Pc_Mae:
-  datatransforms: []
+  datatransforms: [PointCloudCenterAndNormalize]
+  kwargs:
+    gravity_dim: 1
+    centering: False

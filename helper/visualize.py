@@ -21,7 +21,7 @@ class Visualizer(object):
         scene = [cls.__create_cos(scale, center)]
         for o in objs:
             if isinstance(o, trimesh.Trimesh):
-                o = objs.as_open3d
+                o = o.as_open3d
                 o.compute_vertex_normals()
             scene = scene + o
 
@@ -32,11 +32,11 @@ class Visualizer(object):
         scene = [cls.__create_cos(scale, center)]
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(torch.Tensor.cpu(tensor['pos']))
-        pcd.colors = o3d.utility.Vector3dVector(torch.Tensor.cpu(tensor['colors']))
+        if tensor['colors'] is not None:
+            pcd.colors = o3d.utility.Vector3dVector(torch.Tensor.cpu(tensor['colors']))
         scene.append(pcd)
         o3d.visualization.draw_geometries(scene)
 
-        print('test')
 
     @classmethod
     def render_pointcloud_with_panda_grippers(points, colors, grasp_pos, grasp_quat, width=0.01, vis=False):

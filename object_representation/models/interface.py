@@ -43,9 +43,10 @@ class FeatureExtractor(object):
         self.obj = obj
 
     def _obj2pc(self):
-        self.pc = Sampler.vertex_sample(self.obj, self.device)
+        self.pc = Sampler.uniform_sample(self.obj, self.device)
 
     def _transform(self):
+        #Todo: Keyword arguments for transformations via config
         Visualizer.o3d_tensor(self.pc)
         for t in eval(f'self.cfg.{self.__class__.__name__}.datatransforms'):
             func = getattr(transforms, t)()

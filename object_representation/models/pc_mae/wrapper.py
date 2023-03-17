@@ -5,7 +5,7 @@ from object_representation.openpoints.utils import EasyConfig
 from object_representation.openpoints.models.build import build_model_from_cfg
 from object_representation.openpoints.utils import load_checkpoint
 
-
+#Todo: add Rotation of KOS in Config and create transformation
 class Pc_Mae(FeatureExtractor):
 
     def __init__(self):
@@ -25,7 +25,11 @@ class Pc_Mae(FeatureExtractor):
         self.model.eval()
 
     def _call_model(self):
-        return self.model.MAE_encoder.forward(self.pc['pos'])  # just encode data
+        neighborhood, center = self.model.group_divider(torch.unsqueeze(self.pc['pos'], dim=0))
+        group_input_tokens = self.model.MAE_encoder.encoder(neighborhood)
+        pos = self.model.MAE_encoder.pos_embed(center)
+        x_vis = self.model.MAE_encoder.blocks(group_input_tokens, pos)
+        return self.model.MAE_encoder.norm(x_vis)
 
     def extract(self):
         self._preprocess()
