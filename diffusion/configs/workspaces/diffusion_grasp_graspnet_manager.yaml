@@ -1,0 +1,38 @@
+_target_: workspaces.diffusion_grasp_workspace_manager.DiffusionGraspManager
+_recursive_: false
+
+dataset_fn:
+  _target_: environments.diffusion_grasp.dataloader.get_train_val
+  root_directory: ${root_path}
+  data_directory: ${data_path}
+  h5_directory: ${h5_path}
+  subbatch_size: 100 #num grasps per object for each sample. when 1 ist fast enough use 1.
+  train_fraction: 0.95
+#  random_seed: ${seed}
+  device: ${device}
+  processor:
+    _target_: processors.diffusion_grasp_processor.DiffusionGraspProcessor
+    representation: 'trans_quat_representation'  # ,rotation_6d_representation, ,se3_log_map_representation
+    sampler: 'random_vertex_sample'
+    transform: 'center_transform'
+    scaler: 'ball_scale'
+    scale_factor: 1
+    num_points: ${pc_dim}
+    use_normals: True
+    use_colors: False
+    device: ${device}
+
+
+seed: ${seed}
+train_batch_size: 4
+test_batch_size: 1
+num_workers: 0 # 4 gives cuda error
+pin_memory: False
+eval_n_times: 100
+eval_n_steps: 300
+device: ${device}
+#scale_data: ${scale_data}
+train_fraction: 0.95
+render: False
+
+

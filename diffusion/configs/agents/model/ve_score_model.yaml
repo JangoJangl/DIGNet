@@ -1,0 +1,32 @@
+_target_: networks.edm_diffusion.wrappers.VEPrecond
+_recursive_: false
+
+state_dim: ${obs_dim}
+action_dim: ${action_dim}
+
+use_fp16: false
+sigma_min: ${agents.sigma_min}
+sigma_max: ${agents.sigma_max}
+
+model:
+  _target_: networks.edm_diffusion.score_mlps.TimeScoreNetwork
+  _recursive_: false
+  obs_dim: ${obs_dim}
+  action_dim: ${action_dim}
+  hidden_dim: ${hidden_dim}
+  time_embed_dim: ${t_dim}
+  embed_fn:
+    _target_: networks.edm_diffusion.utils.return_time_sigma_embedding_model
+     # 'GaussianFourier' 'FourierFeatures' or 'Sinusoidal'
+    embedding_type: 'GaussianFourier'
+    time_embed_dim: ${t_dim} # ${t_dim} # ${hidden_dim}
+    device: ${device}
+  num_hidden_layers: ${num_hidden_layers}
+  output_dim: ${action_dim}
+  dropout: 0
+  activation: "Mish"
+  model_style: 'nonresidual'
+  use_spectral_norm: false
+  use_norm: false
+  norm_style: 'BatchNorm'
+  device: ${device}

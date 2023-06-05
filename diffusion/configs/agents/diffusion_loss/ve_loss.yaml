@@ -1,0 +1,2 @@
+_target_: networks.edm_diffusion.losses.EDMLoss
+_recursive_: false

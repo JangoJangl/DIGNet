@@ -1,0 +1,62 @@
+defaults:
+  - agents: diffusion_grasp_agent #  k_diffusion_agent  # gpt_bc_agent # k_diffusion_agent  lfp_agent
+  - workspaces: diffusion_grasp_manager
+
+log_dir: logs/grasping_pre_embedded_objects/
+plot_dir: plots/grasping_pre_embedded_objects/
+plot_name: ${now:%Y-%m-%d}.png
+data_path: /home/temp_store/jandl/Dataset/acronym
+embedding_path: /home/temp_store/jandl/Dataset/acronym/embeddings
+external_grasp_path: /home/temp_store/jandl/Dataset/acronym/grasps
+internal_grasp_path: /home/temp_store/jandl/Dataset/acronym/mesh_contacts_graspnet
+
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+
+group: diffusion_grasp_first_try
+
+wandb:
+  entity: kevin-jandl
+  project: pre-embedding-objects
+
+device: 'cuda'
+seed: 42
+scale_data: false
+window_size: 1
+#Todo: rename here and in model
+action_dim: 7
+input_dim: 60
+obs_dim: 60
+# kick goal dim
+goal_dim: 3
+render: false
+
+# diffusion model params
+hidden_dim: 512 # for MLP
+use_spectral_norm: false
+num_hidden_layers: 6
+max_train_steps: 60000
+epoch: 50
+eval_every_n_steps: 4000
+residual_style: True
+latent_dim: 32
+
+# noise conditional score based models parameters
+sigma_max: 33
+sigma_min: 0.42
+decay: 0.999
+update_ema_every_n_steps: 1
+
+# diffusion hyper params
+activation: "Mish"
+n_timesteps: 5
+beta_schedule: 'cosine'
+diffusion_x: false
+diffusion_x_M: 32
+diffusion_kde: false
+diffusion_kde_samples: 100
+use_ema: false

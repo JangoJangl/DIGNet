@@ -1,0 +1,217 @@
+from math import fabs
+import os
+import logging
+
+import hydra
+import wandb
+from omegaconf import DictConfig, OmegaConf
+import torch
+from networks.k_diffusion.classifier_free_sampler import ClassifierFreeSampleModel
+
+
+log = logging.getLogger(__name__)
+
+
+OmegaConf.register_new_resolver(
+     "add", lambda *numbers: sum(numbers)
+)
+torch.cuda.empty_cache()
+
+
+def main(model_store_path: str) -> None:
+    
+    # Choose, which evaluation method should be used
+    test_classifier_free_guidance = False
+    test_single_variant = False
+    test_sequential_goals = True
+    test_all_samplers = False
+    compare_noisy_sampler = False
+    compare_samplers_over_diffent_steps = False
+    compare_classifier_free_guidance = False
+    render_workspace = False
+    compare_kde = False
+    
+    param_config = {
+        'log_wandb': True,
+        'num_runs': 20,
+        'n_inference_steps': 14,
+        'sampler_type': 'dpmpp_2s',
+        'sigma_min': 0.33,
+        'sigma_max': 40.5,
+        'rho': 5,
+        's_churn': 0,
+        's_min': 0,
+        'keep_last_action': False,
+        'use_scaler': False,
+        'get_mean': None,
+        'test_classifier_free_guidance': False,
+        'cond_lambda': 1,
+        'use_kde': False,
+        'noise_scheduler': 'iddpm',
+        'device': 'cpu'
+    }
+    
+    param_config['group'] = f'noise_comp_' + param_config['sampler_type']
+    wandb.config = param_config
+    if param_config['log_wandb']:
+        run = wandb.init(
+            project='gc_block_push_sampler_comparison', 
+            entity='bennoq', 
+            group=f'noise_comp_' + param_config['sampler_type'],
+            mode="disabled",  
+            config=wandb.config
+        )
+        param_config = wandb.config
+    
+    # get the path to the config yaml file
+    cfg_store_path = os.path.join(model_store_path,'.hydra/config.yaml')
+    # get path to the bet repo -> required for the block push environment if needed
+    os.environ['ASSET_PATH'] = "/home/moritz/code/bet"
+    # init wandb logger and config from hydra path 
+    cfg = OmegaConf.load(cfg_store_path) 
+    torch.manual_seed(cfg.seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    cfg['device'] = param_config['device']
+    cfg.workspaces['device'] = param_config['device']
+    cfg.agents['device'] = param_config['device']
+    # cfg.agents.model['device'] = param_config['device']
+    # load the required classes to train and test the agent 
+    cfg.workspaces['goal_fn']['sequential_goal'] = True
+    workspace_manager = hydra.utils.instantiate(cfg.workspaces)
+    agent = hydra.utils.instantiate(cfg.agents)
+    # get the scaler instance and set teh bounds for the sampler if required
+    agent.get_scaler(workspace_manager.scaler)
+    agent.set_bounds(workspace_manager.scaler)
+    agent.load_pretrained_model(model_store_path)
+
+    agent.sigma_max = param_config['sigma_max']
+    agent.sigma_min = param_config['sigma_min']
+    # agent.rho = param_config['rho']
+    if render_workspace:
+        workspace_manager.render = True
+    else:
+        workspace_manager.render = False
+
+    if param_config['test_classifier_free_guidance']:
+        # load the classifier free wrapper
+        agent.model = ClassifierFreeSampleModel(agent.model, cond_lambda=param_config['cond_lambda'])
+    elif param_config['cond_lambda'] > 1:
+        agent.model = ClassifierFreeSampleModel(agent.model, cond_lambda=param_config['cond_lambda'])
+    if param_config['use_kde']:
+        agent.use_kde = True
+
+    if test_sequential_goals:
+        workspace_manager.eval_n_times = param_config['num_runs']
+        
+        workspace_manager.test_agent_on_sequential_tasks(
+            agent, 
+            log_wandb=param_config['log_wandb'],
+            new_sampler_type=param_config['sampler_type'],
+            n_inference_steps=param_config['n_inference_steps'],
+            get_mean=param_config['get_mean'],
+            extra_args={
+                'keep_last_actions': param_config['keep_last_action'],
+                's_churn': param_config['s_churn'],
+                'use_scaler': param_config['use_scaler'],
+                's_min': param_config['s_min']
+                },
+            noise_scheduler=param_config['noise_scheduler']
+            )
+    
+    if test_single_variant:
+        # workspace_manager.eval_n_steps = 500
+        workspace_manager.eval_n_times = param_config['num_runs']
+        
+        workspace_manager.test_agent(
+            agent, 
+            log_wandb=param_config['log_wandb'],
+            new_sampler_type=param_config['sampler_type'],
+            n_inference_steps=param_config['n_inference_steps'],
+            get_mean=param_config['get_mean'],
+            extra_args={
+                'keep_last_actions': param_config['keep_last_action'],
+                's_churn': param_config['s_churn'],
+                'use_scaler': param_config['use_scaler'],
+                's_min': param_config['s_min']
+                },
+            noise_scheduler=param_config['noise_scheduler']
+            )
+    if test_all_samplers:
+        workspace_manager.compare_sampler_types(
+            agent, 
+            num_runs=param_config['num_runs'], 
+            num_steps_per_run=280, 
+            log_wandb=False, 
+            n_inference_steps=param_config['n_inference_steps'],
+            get_mean=None,
+            store_path=model_store_path
+        )
+    if compare_samplers_over_diffent_steps:
+        workspace_manager.compare_sampler_types_over_n_steps(
+            agent, 
+            num_runs=param_config['num_runs'],  
+            steps_list=  [1, 2, 3, 4, 5, 10, 20, 40, 50], # [5, 10, 50],
+            log_wandb=False, 
+            get_mean=None,
+            store_path=model_store_path,
+            extra_args={
+                'keep_last_actions': param_config['keep_last_action'],
+                's_churn': param_config['s_churn'],
+                'use_scaler': param_config['use_scaler'],
+                's_min': param_config['s_min']
+                }
+        )
+
+    if compare_classifier_free_guidance:
+        workspace_manager.compare_classifier_free_guidance(
+            agent, 
+            num_runs=param_config['num_runs'], 
+            sampler_type=param_config['sampler_type'],
+            num_steps_per_run=280,
+            cond_lambda_list=[0, 1, 1.5, 2, 2.5], 
+            n_inference_steps=param_config['n_inference_steps'],
+            log_wandb=False, 
+            get_mean=None,
+            store_path=model_store_path,
+            extra_args={
+                'keep_last_actions': param_config['keep_last_action'],
+                's_churn': param_config['s_churn'],
+                'use_scaler': param_config['use_scaler'],
+                's_min': param_config['s_min']
+                }
+        )
+    if compare_noisy_sampler:
+        workspace_manager.compare_noisy_sampler(
+            agent,  
+            num_runs=param_config['num_runs'],
+            num_steps_per_run=280,
+            n_inference_steps=param_config['n_inference_steps'],
+            log_wandb=False,
+            get_mean=None,
+            store_path=model_store_path
+            )
+
+    if compare_kde:
+        workspace_manager.compare_kde_vs_mean_vs_single(
+            agent,
+            num_runs=param_config['num_runs'], 
+            sampler_type=param_config['sampler_type'],
+            num_steps_per_run=280,
+            n_inference_steps=param_config['n_inference_steps'],
+            log_wandb=False, 
+            get_mean=None,
+            store_path=model_store_path,
+            extra_args={
+                'keep_last_actions': param_config['keep_last_action'],
+                's_churn': param_config['s_churn'],
+                'use_scaler': param_config['use_scaler'],
+                's_min': param_config['s_min']
+                }
+            )
+
+
+if __name__ == "__main__":
+    # model_store_path = '/home/moritz/code/generative_learning_from_play/logs/multipath/runs/2023-02-15/17-44-23'
+    model_store_path = '/home/moritz/code/generative_learning_from_play/logs/franka_kitchen/runs/2023-01-25/22-33-02/seed=3'
+    main(model_store_path)

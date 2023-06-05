@@ -1,0 +1,6 @@
+_target_: networks.edm_diffusion.losses.EDMLoss
+_recursive_: false
+
+P_mean: -1.2
+P_std:  1.2
+sigma_data: ${sigma_data}
