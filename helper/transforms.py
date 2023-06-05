@@ -1,1 +1,0 @@
-# Todo: transform into Boundingbox coord (think about the inference pipeline boundingbox)

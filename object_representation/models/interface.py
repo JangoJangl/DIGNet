@@ -30,10 +30,15 @@ class FeatureExtractor(object):
     #     pass
 
     def _preprocess(self):
+        #Todo make this configurable with config file
+        self._obj_transform()
         self._obj2pc()
-        self._transform()
+        self._pc_transform()
 
     def extract(self):
+        pass
+
+    def _obj_transform(self):
         pass
 
     def _add_transforms(self, trans):
@@ -43,15 +48,16 @@ class FeatureExtractor(object):
         self.obj = obj
 
     def _obj2pc(self):
-        self.pc = Sampler.uniform_sample(self.obj, self.device)
+        self.pc = Sampler.poisson_disk_sample(self.obj, self.device)
 
-    def _transform(self):
+    def _pc_transform(self):
         #Todo: Keyword arguments for transformations via config
-        Visualizer.o3d_tensor(self.pc)
+
+        # Visualizer.o3d_tensor(self.pc)
         for t in eval(f'self.cfg.{self.__class__.__name__}.datatransforms'):
             func = getattr(transforms, t)()
             self.pc = func(self.pc)
-            Visualizer.o3d_tensor(self.pc)
+            # Visualizer.o3d_tensor(self.pc)
 
     def clear(self):
         self.obj = None

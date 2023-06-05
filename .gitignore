@@ -1,3 +1,5 @@
 /dataset/
 /.idea/
 /__pycache__/
+/diffusion/logs/
+/diffusion/outputs/

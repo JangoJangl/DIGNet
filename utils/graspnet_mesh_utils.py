@@ -14,6 +14,7 @@ from tqdm import tqdm
 import trimesh
 import trimesh.transformations as tra
 import open3d as o3d
+from helper.visualize import Visualizer
 
 
 class Object(object):
@@ -41,12 +42,14 @@ class Object(object):
         self.collision_manager.add_object('object', self.mesh)
 
     def rescale(self, scale=1.0):
+        # Todo: resolve rescaling issue
         """Set scale of object mesh.
 
         :param scale
         """
         self.scale = scale
         self.mesh.apply_scale(self.scale)
+        # self.mesh_o3d.scale(self.scale, center=self.mesh_o3d.get_center())
 
     def resize(self, size=1.0):
         """Set longest of all three lengths in Cartesian space.
@@ -55,6 +58,7 @@ class Object(object):
         """
         self.scale = size / np.max(self.mesh.extents)
         self.mesh.apply_scale(self.scale)
+        self.mesh_o3d.scale(self.scale, center=self.mesh_o3d.get_center())
 
     def in_collision_with(self, mesh, transform):
         """Check whether the object is in collision with the provided mesh.
@@ -64,6 +68,14 @@ class Object(object):
         :return: boolean value
         """
         return self.collision_manager.in_collision_single(mesh, transform=transform)
+
+    def rotate(self, euler_angles):
+        """Rotate object mesh.
+
+        :param euler_angles: Euler angles in radians
+        """
+        self.mesh.apply_transform(tra.euler_matrix(*euler_angles))
+        self.mesh_o3d.rotate(self.mesh_o3d.get_rotation_matrix_from_xyz(euler_angles), center=(0, 0, 0))
 
 
 class PandaGripper(object):

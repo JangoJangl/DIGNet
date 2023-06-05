@@ -11,9 +11,10 @@ import torch.nn as nn
 import numpy as np
 import open3d as o3d
 import trimesh
+from pathlib import Path
 
 from openpoints.utils import EasyConfig
-from models import build_models
+# from models import build_models
 from utils.graspnet_mesh_utils import Object
 
 sys.path.insert(0, os.path.abspath(
@@ -35,6 +36,9 @@ def get_paths(paths):
 
 def load_data(file, root):
     with h5py.File(os.path.join(root, 'grasps', file), "r") as f:
+        gen = h5py_dataset_iterator(f)
+        for x in gen:
+            print(x)
         print('data loaded')
         mesh_file = f["object/file"][()].decode('utf-8')
         mesh_scale = f["object/scale"][()]
@@ -44,12 +48,7 @@ def load_data(file, root):
         else:
             o = None
 
-    return os.path.join(root, 'grasps', file), o
-
-
-def load_model(path):
-    pass
-
+    return os.path.join(root, mesh_file), o
 
 def extract_features(o, mods):
     feat = {}
@@ -60,9 +59,12 @@ def extract_features(o, mods):
     return feat
 
 
-
-def save_dataset(d, emb):
-    pass
+def save_dataset(object_path: str, emb):
+    emb_np = {k: v.type('torch.DoubleTensor').detach().cpu().numpy() for k, v in emb.items()}
+    emb_path, file_name = object_path.replace('meshes', 'embeddings').replace('.obj', '.npz').rsplit('/', 1)
+    if not os.path.exists(emb_path):
+        Path(emb_path).mkdir(parents=True, exist_ok=True)
+    np.savez(os.path.join(emb_path, file_name), **emb_np)
 
 
 def h5py_dataset_iterator(g, prefix=''):
@@ -92,10 +94,9 @@ if __name__ == "__main__":
     cfg = EasyConfig()
     cfg.load(cfg_path)
     grasp_paths = get_paths(cfg.paths)
-    models = build_models(cfg.models)
+    # models = build_models(cfg.models)
     for p in grasp_paths:
-        grasp_hdf5_path, obj = load_data(p, cfg.paths.acronym)
-        # visualize_mesh_o3d(obj.mesh.as_open3d)
+        obj_path, obj = load_data(p, cfg.paths.acronym)
         if obj is not None:
             embeddings = extract_features(obj, models)
-            # save_dataset(grasp_hdf5_path, embeddings)
+            save_dataset(obj_path, embeddings)

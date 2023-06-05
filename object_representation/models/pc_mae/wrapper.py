@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 
 from ..interface import FeatureExtractor
@@ -35,3 +36,10 @@ class Pc_Mae(FeatureExtractor):
         self._preprocess()
         print(self.__dict__)
         return self._call_model()
+
+    def _obj_transform(self):
+        self.obj.rotate((-np.pi / 2, 0, 0))
+
+
+
+
