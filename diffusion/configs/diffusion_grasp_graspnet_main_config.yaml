@@ -5,9 +5,9 @@ defaults:
 log_dir: logs/grasping_end_to_end_learning/
 plot_dir: plots/grasping_end_to_end_learning/
 plot_name: ${now:%Y-%m-%d}.png
-root_path: /home/temp_store/jandl/Dataset/acronym
-data_path: /home/temp_store/jandl/Dataset/acronym/mesh_contacts_graspnet
-h5_path: /home/temp_store/jandl/Dataset/acronym/grasps
+root_path: /home/kit/anthropomatik/rt3040/Datasets/acronym
+data_path: /home/kit/anthropomatik/rt3040/Datasets/acronym/mesh_contacts_graspnet
+h5_path: /home/kit/anthropomatik/rt3040/Datasets/acronym/grasps
 
 hydra:
   run:
