@@ -15,11 +15,11 @@ class DiffusionGraspProcessor(object):
             representation: str = 'rot_6d_representation',
             sampler: str = 'vertices_sampler',
             transform: str = 'center_transform',
-            scaler: str = 'ball_scale',
+            scaler: str = 'var_scale',
             num_points: int = 1024,
             scale_factor: float = 1.0,
             rotation_factor: float = 2 * np.pi,
-            use_normals: bool = True,
+            use_normals: bool = False,
             use_colors: bool = False,
             device: str = 'cuda'):
 
@@ -28,6 +28,7 @@ class DiffusionGraspProcessor(object):
         self.use_normals = use_normals
         self.use_colors = use_colors
         self.device = device
+        self.current_obj = None
 
         self.__get_representation(representation)        # representation of grasp transformation
         self.__get_sampler(sampler)                      # sampler used to sample points from mesh
@@ -37,6 +38,7 @@ class DiffusionGraspProcessor(object):
     def __get_representation(self, representation):
         try:
             self.representation = eval(f"Representation.{representation}")
+            self.representation_name = representation
         except AttributeError as e:
             print(e)
 
@@ -54,7 +56,7 @@ class DiffusionGraspProcessor(object):
 
     def __get_scaler(self, scaler):
         try:
-            self.scaler = eval(f"Scaler.{scaler}")
+            self.scaler = eval(f"Scaler().{scaler}")
         except AttributeError as e:
             print(e)
 
@@ -62,19 +64,22 @@ class DiffusionGraspProcessor(object):
     def preprocess(self, obj, grasps):
         # Visualizer.visualize(obj, grasps)
         obj, grasps = Transform.start_transform(obj, grasps)
-        # obj, grasps, self.inverse_transform_function = self.transform(obj, grasps)  #Todo fix transofrm of grasps
         # Visualizer.visualize(obj, grasps)
+        self.current_obj = obj
+
         obj = self.sampler(obj, num_points=self.num_points, use_normals=self.use_normals, use_colors=self.use_colors, device=self.device)
+        # obj, grasps, self.inverse_transform_function = self.transform(obj, grasps)  #Todo fix transofrm of grasps
         # Visualizer.visualize(obj, grasps)
         grasps, self.inverse_representation_function = self.representation(grasps, device=self.device)
         # Visualizer.visualize(obj, grasps, inverse=self.inverse_representation_function)
-        obj, grasps = self.scaler(obj, grasps, scale_factor=self.scale_factor)
+        obj, grasps, self.inverse_scaler = self.scaler(obj, grasps, self.representation_name)
         # Visualizer.visualize(obj, grasps, inverse=self.inverse_representation_function)
         return obj, grasps
 
     def postprocess(self, grasps):
+        grasps = self.inverse_scaler(grasps)
         grasps = self.inverse_representation_function(grasps)
-        grasps = self.inverse_transform_function(grasps)
+        # grasps = self.inverse_transform_function(grasps)
         return grasps
 
     def __call__(self, obj, grasps):

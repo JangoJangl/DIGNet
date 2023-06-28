@@ -122,7 +122,7 @@ class ResidualMLPNetwork(nn.Module):
     def forward(self, x):
 
         for idx, layer in enumerate(self.layers):
-            x = layer(x.to(torch.float32))
+            x = layer(x)
         return x
 
     def get_device(self, device: torch.device):
@@ -216,7 +216,7 @@ class DistributionResidualMLPNetwork(nn.Module):
     def forward(self, x):
 
         for idx, layer in enumerate(self.layers):
-            x = layer(x.to(torch.float32))
+            x = layer(x)
         mean = self.mean_layer(x)
         std = self.std_layer(x)
         return mean, std

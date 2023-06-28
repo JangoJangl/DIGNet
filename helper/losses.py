@@ -2,8 +2,8 @@ import torch
 import pytorch3d as p3d
 import numpy as np
 from helper.transform import wrist_to_finger_center
-from helper.visualize import Visualizer
 import os
+from sklearn.neighbors import NearestNeighbors
 
 
 
@@ -82,4 +82,48 @@ def chamfer_loss(pred, target):
 
     return loss
 
+
+def chamfer_distance(x, y, metric='l2', direction='bi'):
+    """Chamfer distance between two point clouds
+
+    https://gist.github.com/sergeyprokudin/c4bf4059230da8db8256e36524993367
+
+    Parameters
+    ----------
+    x: numpy array [n_points_x, n_dims]
+        first point cloud
+    y: numpy array [n_points_y, n_dims]
+        second point cloud
+    metric: string or callable, default ‘l2’
+        metric to use for distance computation. Any metric from scikit-learn or scipy.spatial.distance can be used.
+    direction: str
+        direction of Chamfer distance.
+            'y_to_x':  computes average minimal distance from every point in y to x
+            'x_to_y':  computes average minimal distance from every point in x to y
+            'bi': compute both
+    Returns
+    -------
+    chamfer_dist: float
+        computed bidirectional Chamfer distance:
+            sum_{x_i \in x}{\min_{y_j \in y}{||x_i-y_j||**2}} + sum_{y_j \in y}{\min_{x_i \in x}{||x_i-y_j||**2}}
+    """
+
+    if direction == 'y_to_x':
+        x_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(x)
+        min_y_to_x = x_nn.kneighbors(y)[0]
+        chamfer_dist = np.mean(min_y_to_x)
+    elif direction == 'x_to_y':
+        y_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(y)
+        min_x_to_y = y_nn.kneighbors(x)[0]
+        chamfer_dist = np.mean(min_x_to_y)
+    elif direction == 'bi':
+        x_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(x)
+        min_y_to_x = x_nn.kneighbors(y)[0]
+        y_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(y)
+        min_x_to_y = y_nn.kneighbors(x)[0]
+        chamfer_dist = np.mean(min_y_to_x) + np.mean(min_x_to_y)
+    else:
+        raise ValueError("Invalid direction type. Supported types: \'y_x\', \'x_y\', \'bi\'")
+
+    return chamfer_dist
 

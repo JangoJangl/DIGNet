@@ -17,7 +17,7 @@ class Visualizer(object):
 
     # works just with printable object for o3d
     @staticmethod
-    def visualize(objs, grasps, inverse=lambda x: x, scale=0.1, center=(0, 0, 0), colors=[[0, 0, 1], [0, 1, 0], [1, 0, 0]], use_gripper_mesh=False):
+    def visualize(objs, grasps, inverse=lambda x: x, scale=0.1, center=(0, 0, 0), colors=[], use_gripper_mesh=False, bad_idx=[]):
 
         if isinstance(objs, Iterable) is False or isinstance(objs, torch.Tensor) is True:
             objs = [objs]
@@ -30,8 +30,7 @@ class Visualizer(object):
             elif isinstance(o, torch.Tensor):
                 obj = o3d.geometry.PointCloud()
                 obj.points = o3d.utility.Vector3dVector(torch.Tensor.cpu(o[:, :3]))
-                if o.shape[1] == 9:
-                    obj.colors = o3d.utility.Vector3dVector(torch.Tensor.cpu(o[:, 6:9]))
+                obj.paint_uniform_color([0, 0, 0])
                 obj.normals = o3d.utility.Vector3dVector(torch.Tensor.cpu(o[:, -3:]))
             elif isinstance(o, o3d.geometry.Geometry3D):
                 obj = o
@@ -42,15 +41,26 @@ class Visualizer(object):
 
         for i, g in enumerate(grasps):
             g = inverse(g.to('cpu'))  # transform grasp to homogenous matrix
-            color = colors[i % len(colors)]
+            # color = colors[i % len(colors)]
+            if len(colors) and len(grasps) == len(colors):
+                color = colors[i]
+
+            elif i in bad_idx:
+                color = [1, 0, 0]
+            else:
+                color = [0, 1, 0]
             if use_gripper_mesh is True:
-                gripper = Visualizer.create_gripper_mesh(color)
+                gripper = create_gripper_mesh(color)
             else:
                 gripper = Visualizer.create_gripper_marker(color)
-            gripper = gripper.transform(g)
+            gripper = gripper.transform(g.detach()) if g.requires_grad else gripper.transform(g)
             scene.append(gripper)
 
         o3d.visualization.draw_geometries(scene)
+
+
+
+
 
     @staticmethod
     def render_pointcloud_with_panda_grippers(points, colors, grasp_pos, grasp_quat, width=0.01, vis=False):
@@ -130,7 +140,7 @@ class Visualizer(object):
         return img_mid, img_left, img_right
 
     @staticmethod
-    def create_cos(scale, center):
+    def create_cos(scale=0.1, center=[0, 0, 0]):
         return o3d.geometry.TriangleMesh.create_coordinate_frame().scale(scale, center=center)
 
     @staticmethod
@@ -178,39 +188,6 @@ class Visualizer(object):
         return tmp
 
     @staticmethod
-    def create_gripper_mesh(color=[0, 0, 1], width=0.1):
-        """
-
-        :param color: color of gripper
-        :param width: desired gripper width
-        :return: open3d mesh of panda gripper
-        """
-        finger_path = sim_framework_path("models", "mj", "robot", "assets", "fingerv.stl")
-        hand_path = sim_framework_path("models", "mj", "robot", "assets", "handv.stl")
-
-        finger_mesh_left = o3d.io.read_triangle_mesh(finger_path)
-        finger_mesh_right = o3d.io.read_triangle_mesh(finger_path)
-        hand_mesh = o3d.io.read_triangle_mesh(hand_path)
-
-        finger_mesh_right.rotate(quat2mat([0, 0, 0, 1]), center=[0, 0, 0])
-        finger_mesh_right.translate([0, -width / 2, -0.055])
-        finger_mesh_left.translate([0, width / 2, -0.055])
-        hand_mesh.translate([0, 0, -0.1134])
-
-        gripper_mesh = copy.deepcopy(hand_mesh)
-        gripper_mesh += finger_mesh_right
-        gripper_mesh += finger_mesh_left
-
-        gripper_mesh.paint_uniform_color(color)
-        gripper_mesh.compute_vertex_normals()
-
-        gripper_mesh = transform_in_acronym_cos(gripper_mesh)
-
-        gripper_mesh.transform(w2f())
-
-        return gripper_mesh
-
-    @staticmethod
     def visualize_cp_tar_pred(obj, target, pred, points_target, points_pred):
 
         scene = [Visualizer.create_cos(0.1, (0, 0, 0))]
@@ -249,3 +226,69 @@ def transform_in_acronym_cos(mesh):
     mesh.rotate(quat2mat([0.707, 0, 0, 0.707]), center=[0, 0, 0])
     mesh.translate([0, 0, 0.11217])
     return mesh
+
+def create_gripper_mesh(color=[0, 0, 1], width=0.1, simplified=False):
+    """
+
+    :param color: color of gripper
+    :param width: desired gripper width
+    :return: open3d mesh of panda gripper
+    """
+    finger_path = sim_framework_path("models", "mj", "robot", "assets", "fingerv.stl")
+    hand_path = sim_framework_path("models", "mj", "robot", "assets", "handv.stl")
+
+    finger_mesh_left = o3d.io.read_triangle_mesh(finger_path)
+    finger_mesh_right = o3d.io.read_triangle_mesh(finger_path)
+    hand_mesh = o3d.io.read_triangle_mesh(hand_path)
+
+    if simplified:
+        finger_mesh_left = finger_mesh_left.simplify_vertex_clustering(0.005)
+        finger_mesh_right = finger_mesh_right.simplify_vertex_clustering(0.005)
+        hand_mesh, _ = hand_mesh.compute_convex_hull()
+
+    finger_mesh_right.rotate(quat2mat([0, 0, 0, 1]), center=[0, 0, 0])
+    finger_mesh_right.translate([0, -width / 2, -0.055])
+    finger_mesh_left.translate([0, width / 2, -0.055])
+    hand_mesh.translate([0, 0, -0.1134])
+
+    gripper_mesh = copy.deepcopy(hand_mesh)
+    gripper_mesh += finger_mesh_right
+    gripper_mesh += finger_mesh_left
+
+    gripper_mesh.paint_uniform_color(color)
+    gripper_mesh.compute_vertex_normals()
+
+    gripper_mesh = transform_in_acronym_cos(gripper_mesh)
+
+    gripper_mesh.transform(w2f())
+
+    return gripper_mesh
+
+
+def create_finger_mesh(color=[0, 0, 1], width=0.1):
+    """
+
+    :param color: color of gripper
+    :param width: desired gripper width
+    :return: open3d mesh of panda gripper
+    """
+    finger_path = sim_framework_path("models", "mj", "robot", "assets", "fingerv.stl")
+
+    finger_mesh_left = o3d.io.read_triangle_mesh(finger_path)
+    finger_mesh_right = o3d.io.read_triangle_mesh(finger_path)
+
+    finger_mesh_right.rotate(quat2mat([0, 0, 0, 1]), center=[0, 0, 0])
+    finger_mesh_right.translate([0, -width / 2, -0.055])
+    finger_mesh_left.translate([0, width / 2, -0.055])
+
+    gripper_mesh = copy.deepcopy(finger_mesh_right)
+    gripper_mesh += finger_mesh_left
+
+    gripper_mesh.paint_uniform_color(color)
+    gripper_mesh.compute_vertex_normals()
+
+    gripper_mesh = transform_in_acronym_cos(gripper_mesh)
+
+    gripper_mesh.transform(w2f())
+
+    return gripper_mesh

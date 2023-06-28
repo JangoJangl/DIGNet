@@ -1,0 +1,9 @@
+_target_: networks.vision_encoder.vnn_pointnet.VNNPointnet2
+_recursive_: false
+
+pointnet_radius: {pointnet_radius}
+hidden_dim: ${hidden_dim}
+in_features: 3 #xyz
+out_features: ${embedding_dim}
+device: ${device}
+

@@ -1,0 +1,117 @@
+{
+    "os": "Linux-5.4.0-146-generic-x86_64-with-glibc2.10",
+    "python": "3.8.16",
+    "heartbeatAt": "2023-04-11T16:34:38.474328",
+    "startedAt": "2023-04-11T16:34:37.979171",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/home/i53/student/jandl/repos/generative-learning-from-play/wandb_test.py",
+    "codePath": "wandb_test.py",
+    "git": {
+        "remote": "git@github.com:mbreuss/generative-learning-from-play.git",
+        "commit": "832859f3cd3dbbb7985878ca55bc6b25d8503d9d"
+    },
+    "email": "kevin-jandl@hotmail.com",
+    "root": "/home/i53/student/jandl/repos/generative-learning-from-play",
+    "host": "rottweiler",
+    "username": "jandl",
+    "executable": "/home/i53/student/jandl/miniconda3/envs/diffusion/bin/python",
+    "cpu_count": 8,
+    "cpu_count_logical": 16,
+    "cpu_freq": {
+        "current": 2158.836,
+        "min": 2200.0,
+        "max": 3600.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2369.146,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 2233.068,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 1988.936,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 1931.439,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 2198.236,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 2199.204,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 2199.796,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 2202.885,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 2207.912,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 2436.217,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 1894.848,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 1891.053,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 2199.546,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 2198.328,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 2199.368,
+            "min": 2200.0,
+            "max": 3600.0
+        },
+        {
+            "current": 2191.394,
+            "min": 2200.0,
+            "max": 3600.0
+        }
+    ],
+    "disk": {
+        "total": 91.10977554321289,
+        "used": 19.678539276123047
+    },
+    "memory": {
+        "total": 31.367218017578125
+    }
+}

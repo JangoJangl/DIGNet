@@ -5,7 +5,9 @@ defaults:
   - model: diffusion_model # diffusion_model
 
 embedder:
-  _target_: networks.embedder.pointnet2.Pointnet2
+  _target_: networks.vision_encoder.pointnet2.Pointnet2
+  normal_channel: ${use_normals}
+  output_dim: ${embedding_dim}
 
 optimization:
   _target_: torch.optim.Adam
@@ -21,5 +23,7 @@ decay: ${decay}
 device: ${device}
 update_ema_every_n_steps: ${update_ema_every_n_steps}
 window_size: ${window_size}
+evaluation: ${evaluation}
+visualize_paths: ${visualize_paths}
 #diffusion_kde: ${diffusion_kde}
 #diffusion_kde_samples: ${diffusion_kde_samples}

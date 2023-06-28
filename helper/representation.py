@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import pytorch3d.transforms as p3d_t
+from theseus.geometry import se3
 
 
 class Representation(object):
@@ -17,15 +18,15 @@ class Representation(object):
         return grasps, inverse_transform
 
 
-    # Todo: logmap representation von pytorch3d kopieren oder pytorch3d updaten
     @staticmethod
     def se3_log_map_representation(grasps, device='cuda'):
         """In the SE(3) logarithmic representation SE(3) matrices
         are represented as 6-dimensional vectors [log_translation | log_rotation],
         i.e. a concatenation of two 3D vectors log_translation and log_rotation."""
-
-        grasps = p3d_t.se3_log_map(grasps)
-        inverse_transform = p3d_t.se3_exp_map
+        se3_grasps = se3.SE3(dtype=torch.get_default_dtype())
+        se3_grasps.update(grasps[:, :3, :]) # no need for the last row of the transformation matrix
+        grasps = se3_grasps.log_map()
+        inverse_transform = Representation.__se3_log_map_inverse_representation
 
         return grasps, inverse_transform
 
@@ -72,4 +73,9 @@ class Representation(object):
         transform[:, :3, 3] = translation
         return transform
 
+    @staticmethod
+    def __se3_log_map_inverse_representation(tensor):
+
+        se3_tensor = se3.SE3.exp_map(tensor)
+        return se3_tensor.to_matrix()
 

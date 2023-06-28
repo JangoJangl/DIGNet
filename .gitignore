@@ -3,4 +3,6 @@
 /__pycache__/
 /diffusion/logs/
 /diffusion/outputs/
+__pycache__/
+/logs/
 

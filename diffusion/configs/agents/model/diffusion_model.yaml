@@ -7,16 +7,16 @@ beta_schedule: ${beta_schedule}
 n_timesteps: ${n_timesteps}
 loss_type: 'l2'
 clip_denoised: true # set to true after defining diffusion space
-predict_epsilon: true
+predict_epsilon: ${predict_epsilon}
 device: ${device}
-#diffusion_x: ${diffusion_x}
-#diffusion_x_M: ${diffusion_x_M}
+diffusion_x: ${diffusion_x}
+diffusion_x_M: ${diffusion_x_M}
 
-
-model: 
-  _target_: networks.diffusion.diffusion_models.DiffusionMLPNetwork 
-  action_dim: ${grasp_dim}
-  obs_dim: ${embedding_dim}
+# Network architecture
+model:
+  _target_: ${model_target}
+  input_dim: ${grasp_dim}
+  cond_dim: ${embedding_dim}
   t_dim: ${t_dim}
   residual_style: ${residual_style}
   hidden_dim: ${hidden_dim}
@@ -24,4 +24,3 @@ model:
   dropout: 0
   activation: ${activation}
   device: ${device}
-  # dim_head: 16

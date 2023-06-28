@@ -17,11 +17,12 @@ OmegaConf.register_new_resolver(
 torch.cuda.empty_cache()
 
 
-@hydra.main(config_path="configs", config_name="diffusion_grasp_graspnet_main_config")
+@hydra.main(config_path="configs", config_name="train_config")
 def main(cfg: DictConfig) -> None:
 
     np.random.seed(cfg.seed)
     torch.manual_seed(cfg.seed)
+    torch.set_default_dtype(torch.float64)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
     # init wandb logger and config from hydra path 
@@ -40,7 +41,7 @@ def main(cfg: DictConfig) -> None:
     agent = hydra.utils.instantiate(cfg.agents)
     # get the scaler instance and set teh bounds for the sampler if required
     agent.get_scaler(workspace_manager.scaler)
-    agent.set_bounds()
+    agent.set_bounds(cfg.grasp_dim)
 
     # train the agent
     agent.train_agent(

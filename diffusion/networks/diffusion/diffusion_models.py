@@ -7,10 +7,13 @@ import math
 from typing import Optional
 from torch.nn import functional as F
 import logging
+from torch.nn.utils import spectral_norm
 
 from networks.utils import return_activiation_fcn
 from networks.diffusion.utils import SinusoidalPosEmb
 from networks.utils import CrossAttention, LayerNorm
+from networks.res_layers import TwoLayerPreActivationResNetLinear
+from networks.conditioning_models import FiLM, ResFiLM
 
 from networks.mlps import ResidualMLPNetwork, MLPNetwork
 
@@ -25,8 +28,8 @@ class DiffusionMLPNetwork(nn.Module):
 
     def __init__(
             self,
-            action_dim: int,
-            obs_dim: int,
+            input_dim: int,
+            cond_dim: int,
             t_dim: int,
             residual_style: bool = True,
             hidden_dim: int = 100,
@@ -45,9 +48,9 @@ class DiffusionMLPNetwork(nn.Module):
         self.device = device
         self.cond_mask_prob = cond_mask_prob
         # number of samples per batch
-        output_dim = action_dim
+        output_dim = input_dim
         # define the input dimension for the model
-        input_dim = obs_dim + action_dim + t_dim
+        input_dim = cond_dim + input_dim + t_dim
         # time embedding model 
         self.temp_layers = nn.Sequential(
             SinusoidalPosEmb(t_dim),
@@ -654,3 +657,98 @@ class DiffusionTransformerNetwork(nn.Module):
 
     def get_params(self):
         return self.parameters()
+
+
+class FiLMResidualMLPNetworkV2(nn.Module):
+    """
+    Simple multi layer perceptron network with residual connections for
+    benchmarking the performance of different networks. The resiudal layers
+    are based on the IBC paper implementation, which uses 2 residual lalyers
+    with pre-actication with or without dropout and normalization.
+    """
+
+    def __init__(
+            self,
+            input_dim: int,
+            cond_dim: int,
+            t_dim: int,
+            residual_style: bool = True,
+            hidden_dim: int = 100,
+            num_hidden_layers: int = 1,
+            output_dim=1,
+            dropout: int = 0,
+            activation: str = "ReLU",
+            use_spectral_norm: bool = False,
+            use_norm: bool = False,
+            norm_style: str = 'BatchNorm',
+            device: str = 'cuda',
+            cond_mask_prob: float = 0
+    ):
+        super(FiLMResidualMLPNetworkV2, self).__init__()
+        self.network_type = "mlp"
+        self.device = device
+        output_dim = input_dim
+        input_dim = input_dim + t_dim
+
+        self.condition_dim = cond_dim
+        self.temp_layers = nn.Sequential(
+            SinusoidalPosEmb(t_dim),
+            nn.Linear(t_dim, t_dim * 2),
+            nn.Mish(),
+            nn.Linear(t_dim * 2, t_dim),
+        )
+        self.temp_layers.to(self.device)
+        self.num_hidden_layers = num_hidden_layers
+        self.cond_mask_prob = cond_mask_prob
+        # set up the network
+        self.hidden_dim = hidden_dim
+        assert num_hidden_layers % 2 == 0
+        if use_spectral_norm:
+            self.layers = nn.ModuleList([spectral_norm(nn.Linear(input_dim, hidden_dim))])
+        else:
+            self.layers = nn.ModuleList([nn.Linear(input_dim, hidden_dim)])
+        self.layers.extend(
+            [
+                TwoLayerPreActivationResNetLinear(
+                    hidden_dim=hidden_dim,
+                    activation=activation,
+                    dropout_rate=dropout,
+                )
+                for i in range(1, num_hidden_layers, 2)
+            ]
+        )
+        self.FiLM_layers = nn.ModuleList([FiLM(self.condition_dim, self.hidden_dim)])
+        self.FiLM_layers.extend(
+            [
+                FiLM(self.condition_dim, self.hidden_dim)
+                for i in range(1, self.num_hidden_layers, 2)
+            ]
+        )
+        self.layers.append(nn.Linear(hidden_dim, output_dim))
+        self.layers.to(self.device)
+
+    def forward(self, x, t, condition):
+
+        t = self.temp_layers(t)
+
+        if len(condition.shape) == 3:
+            # x = einops.rearrange(x, 'batch dim-> batch 1 dim')
+            t = einops.rearrange(t, 'batch dim-> batch 1 dim')
+            x = torch.cat([x, t], dim=2)
+        else:
+            x = torch.cat([x, t], dim=1)
+
+        for idx, layer in enumerate(self.layers):
+            if idx == 0 or idx == len(self.layers) - 1:
+                x = layer(x)
+            else:
+                x = layer(x)
+                x = self.FiLM_layers[idx](condition, x)
+        return x
+
+    def get_device(self, device: torch.device):
+        self.device = device
+        self.layers.to(device)
+
+    def get_params(self):
+        return self.layers.parameters()

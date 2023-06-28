@@ -31,7 +31,7 @@ class Diffusion(nn.Module):
         predict_epsilon=True,
         device: str = 'cuda',
         diffusion_x: bool = False,
-        diffusion_x_M: int=32,
+        diffusion_x_M: int=32
     ) -> None:
         super().__init__()
         self.device = device

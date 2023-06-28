@@ -28,7 +28,9 @@ class Diffusion(nn.Module):
         loss_type: str,
         clip_denoised: bool,
         predict_epsilon=True,
-        device: str = 'cuda'
+        device: str = 'cuda',
+        diffusion_x: bool = False,
+        diffusion_x_M: int=32,
     ) -> None:
         super().__init__()
         self.device = device
@@ -69,6 +71,9 @@ class Diffusion(nn.Module):
 
         # either l1 or l2
         self.loss_fn = Losses[loss_type]()
+
+        self.diffusion_x = diffusion_x
+        self.diffusion_x_M = diffusion_x_M
     
     def get_params(self):
         '''
@@ -172,6 +177,18 @@ class Diffusion(nn.Module):
             # if we want to return the complete chain add thee together
             if return_diffusion: 
                 diffusion.append(x)
+
+        if self.diffusion_x:
+            # The sampling process runs as normal for T denoising timesteps. The denoising timestep is then fixed,
+            # t = 0, and extra denoising iterations continue to run for M timesteps. The intuition behind this
+            # is that samples continue to be moved toward higher-likelihood regions for longer.
+            # https://openreview.net/pdf?id=Pv1GPQzRrC8
+
+            timesteps = torch.full((batch_size,), 0, device=self.device, dtype=torch.long)
+            for m in range(0, self.diffusion_x_M):
+                x = self.p_sample(x, timesteps, condition)
+                if return_diffusion:
+                    diffusion.append(x)
 
         if return_diffusion:
             return x, torch.stack(diffusion, dim=1)

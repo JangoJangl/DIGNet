@@ -15,7 +15,7 @@ class Transform(object):
         obj = obj.apply_transform(t_mean)
 
         f2w = finger_center_to_wrist()  # translate COS to finger center
-        grasps = torch.matmul(grasps, torch.from_numpy(f2w).float().cuda())
+        grasps = torch.matmul(grasps, torch.from_numpy(f2w).cuda())
 
         return obj, grasps
 
@@ -25,6 +25,13 @@ class Transform(object):
         if isinstance(obj, trimesh.Trimesh):
             transform, _ = trimesh.bounds.oriented_bounds(obj)
             obj.apply_transform(transform)
+        elif isinstance(obj, torch.Tensor):
+            obj_mean = obj.mean(dim=0)
+            transform = np.eye(4)
+            transform[:3, 3] = obj_mean.cpu()
+            obj = torch.cat((obj, torch.ones(len(obj)).unsqueeze(1)).cuda(), dim=1)
+            obj = torch.matmul(obj, torch.from_numpy(transform).cuda())
+            obj = obj[:, :3]
         else:
             bbox = obj.get_oriented_bounding_box()
             obj_mean = np.mean(obj.vertices, 0)
@@ -33,7 +40,7 @@ class Transform(object):
             transform[:3, 3] = obj_mean
             obj.transform(transform)
 
-        grasps = torch.matmul(grasps, torch.from_numpy(transform).float().cuda())
+        grasps = torch.matmul(grasps, torch.from_numpy(transform).cuda())
 
         return obj, grasps, inverse_transform(transform)
 
@@ -45,7 +52,7 @@ class Transform(object):
         transform[:3, :3] = bbox.R
         transform[:3, 3] = obj.get_min_bound()
         obj.transform(transform)
-        grasps = torch.matmul(grasps, torch.from_numpy(transform).float().cuda())
+        grasps = torch.matmul(grasps, torch.from_numpy(transform).cuda())
         return obj, grasps, inverse_transform(transform)
 
 

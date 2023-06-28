@@ -1,0 +1,68 @@
+defaults:
+  - agents: diffusion_grasp_agent #  k_diffusion_agent  # gpt_bc_agent # k_diffusion_agent  lfp_agent
+  - workspaces: diffusion_grasp_graspnet_manager
+
+log_dir: logs/grasping_end_to_end_learning/
+plot_dir: plots/grasping_end_to_end_learning/
+plot_name: ${now:%Y-%m-%d}.png
+root_path: /home/temp_store/jandl/Dataset/acronym
+data_path: /home/temp_store/jandl/Dataset/acronym/mesh_contacts_graspnet
+h5_path: /home/temp_store/jandl/Dataset/acronym/grasps
+
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+
+group: diffusion_grasp_first_try
+
+wandb:
+  entity: kevin-jandl
+  project: end_to_end
+
+device: 'cuda'
+seed: 42
+#scale_data: true
+window_size: 1
+
+#grasp_dims: rot_6d -> 9, se3, -> 16, log_map -> 9, trans_quat -> 7
+grasp_dim: 7
+pc_dim: 1024 # pointnet currently works just for 1024 points
+use_normals: true
+embedding_dim: 1024 # just global embedding
+t_dim: 16
+render: false
+
+# diffusion model params
+hidden_dim: 512 # for MLP
+use_spectral_norm: false
+num_hidden_layers: 6
+max_train_steps: 60000
+epoch: 50
+eval_every_n_steps: 4000
+residual_style: True
+latent_dim: 32
+
+# noise conditional score based models parameters
+sigma_max: 33
+sigma_min: 0.42
+decay: 0.999
+update_ema_every_n_steps: 1
+
+# diffusion hyper params
+activation: "Mish"
+n_timesteps: 5
+beta_schedule: 'cosine'
+diffusion_x: false
+diffusion_x_M: 5
+diffusion_kde: false
+diffusion_kde_samples: 100
+use_ema: false
+
+# evaluation params
+
+evaluation: True
+pretrained_model_path: "/home/i53/student/jandl/repos/DIGNet/diffusion/logs/grasping_end_to_end_learning/runs/2023-06-07/19-28-40"
+visualize_paths: ['f1c5b9bb744afd96d6e1954365b10b52.obj', '1f6a7f3705d791762c91206be77753e3.obj', '1ab3abb5c090d9b68e940c4e64a94e1e.obj', '13af92fb42fdc0d774d5a6a8a8e5a2e.obj', ]

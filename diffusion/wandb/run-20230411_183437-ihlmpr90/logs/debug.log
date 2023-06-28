@@ -1,0 +1,32 @@
+2023-04-11 18:34:37,987 INFO    MainThread:25480 [wandb_setup.py:_flush():76] Configure stats pid to 25480
+2023-04-11 18:34:37,987 INFO    MainThread:25480 [wandb_setup.py:_flush():76] Loading settings from /home/i53/student/jandl/.config/wandb/settings
+2023-04-11 18:34:37,987 INFO    MainThread:25480 [wandb_setup.py:_flush():76] Loading settings from /home/i53/student/jandl/repos/generative-learning-from-play/wandb/settings
+2023-04-11 18:34:37,987 INFO    MainThread:25480 [wandb_setup.py:_flush():76] Loading settings from environment variables: {}
+2023-04-11 18:34:37,987 INFO    MainThread:25480 [wandb_setup.py:_flush():76] Applying setup settings: {'_disable_service': False}
+2023-04-11 18:34:37,987 INFO    MainThread:25480 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program_relpath': 'wandb_test.py', 'program': '/home/i53/student/jandl/repos/generative-learning-from-play/wandb_test.py'}
+2023-04-11 18:34:37,987 INFO    MainThread:25480 [wandb_init.py:_log_setup():507] Logging user logs to /home/i53/student/jandl/repos/generative-learning-from-play/wandb/run-20230411_183437-ihlmpr90/logs/debug.log
+2023-04-11 18:34:37,987 INFO    MainThread:25480 [wandb_init.py:_log_setup():508] Logging internal logs to /home/i53/student/jandl/repos/generative-learning-from-play/wandb/run-20230411_183437-ihlmpr90/logs/debug-internal.log
+2023-04-11 18:34:37,988 INFO    MainThread:25480 [wandb_init.py:init():547] calling init triggers
+2023-04-11 18:34:37,988 INFO    MainThread:25480 [wandb_init.py:init():554] wandb.init called with sweep_config: {}
+config: {'learning_rate': 0.02, 'architecture': 'CNN', 'dataset': 'CIFAR-100', 'epochs': 10}
+2023-04-11 18:34:37,988 INFO    MainThread:25480 [wandb_init.py:init():595] starting backend
+2023-04-11 18:34:37,988 INFO    MainThread:25480 [wandb_init.py:init():599] setting up manager
+2023-04-11 18:34:37,990 INFO    MainThread:25480 [backend.py:_multiprocessing_setup():106] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2023-04-11 18:34:38,001 INFO    MainThread:25480 [wandb_init.py:init():605] backend started and connected
+2023-04-11 18:34:38,003 INFO    MainThread:25480 [wandb_init.py:init():695] updated telemetry
+2023-04-11 18:34:38,012 INFO    MainThread:25480 [wandb_init.py:init():732] communicating run to backend with 60.0 second timeout
+2023-04-11 18:34:38,364 INFO    MainThread:25480 [wandb_run.py:_on_init():2176] communicating current version
+2023-04-11 18:34:38,437 INFO    MainThread:25480 [wandb_run.py:_on_init():2185] got version response 
+2023-04-11 18:34:38,437 INFO    MainThread:25480 [wandb_init.py:init():782] starting run threads in backend
+2023-04-11 18:34:40,906 INFO    MainThread:25480 [wandb_run.py:_console_start():2157] atexit reg
+2023-04-11 18:34:40,906 INFO    MainThread:25480 [wandb_run.py:_redirect():2012] redirect: SettingsConsole.WRAP_RAW
+2023-04-11 18:34:40,907 INFO    MainThread:25480 [wandb_run.py:_redirect():2077] Wrapping output streams.
+2023-04-11 18:34:40,907 INFO    MainThread:25480 [wandb_run.py:_redirect():2102] Redirects installed.
+2023-04-11 18:34:40,907 INFO    MainThread:25480 [wandb_init.py:init():824] run started, returning control to user process
+2023-04-11 18:34:40,909 INFO    MainThread:25480 [wandb_run.py:_finish():1892] finishing run diffussion-grasp/my-awesome-project/ihlmpr90
+2023-04-11 18:34:40,909 INFO    MainThread:25480 [wandb_run.py:_atexit_cleanup():2126] got exitcode: 0
+2023-04-11 18:34:40,909 INFO    MainThread:25480 [wandb_run.py:_restore():2109] restore
+2023-04-11 18:34:40,909 INFO    MainThread:25480 [wandb_run.py:_restore():2115] restore done
+2023-04-11 18:34:46,434 INFO    MainThread:25480 [wandb_run.py:_footer_history_summary_info():3476] rendering history
+2023-04-11 18:34:46,434 INFO    MainThread:25480 [wandb_run.py:_footer_history_summary_info():3508] rendering summary
+2023-04-11 18:34:46,438 INFO    MainThread:25480 [wandb_run.py:_footer_sync_info():3434] logging synced files
