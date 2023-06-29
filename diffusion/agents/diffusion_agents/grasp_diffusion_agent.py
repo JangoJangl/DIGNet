@@ -45,7 +45,7 @@ class GraspDiffusionAgent(BaseAgent):
             visualize_paths: list = [],
     ):
         super().__init__(model, embedder, optimization, device, max_train_steps, eval_every_n_steps)
-        self.validation_loss = losses.graspnet_loss # TODO: instantiate loss function by hydra
+        self.validation_loss = losses.trafo_chamfer_distance # TODO: instantiate loss function by hydra
         self.ema_helper = ExponentialMovingAverage(self.model.get_params(), decay, self.device)
         self.use_ema = use_ema
         self.decay = decay
@@ -84,16 +84,17 @@ class GraspDiffusionAgent(BaseAgent):
             test_loader: torch.utils.data.DataLoader
     ):
 
-        best_test_mse = 1e10
+        best_test_loss = 1e2
         generator = iter(train_loader)
         print(self.max_train_steps)
         for step in tqdm(range(self.max_train_steps)):
             # run a test batch every n steps
             if not self.steps % self.eval_every_n_steps:
-                avrg_test_mse = self. evaluate_agent(test_loader)
-                log.info("Step {}: Mean test mse is {}".format(step, avrg_test_mse))
-                if avrg_test_mse < best_test_mse:
-                    best_test_mse = avrg_test_mse
+                diversity_loss, accuracy_loss = self. evaluate_agent(test_loader)
+                log.info("Step {}: Mean diversity loss is {}".format(step, diversity_loss))
+                log.info("Step {}: Mean accuracy loss is {}".format(step, accuracy_loss))
+                if (diversity_loss+accuracy_loss) < best_test_loss:
+                    best_test_loss = diversity_loss+accuracy_loss
                     self.store_model_weights(self.working_dir)
                     log.info('New best test loss. Stored weights have been updated!')
 
@@ -109,8 +110,10 @@ class GraspDiffusionAgent(BaseAgent):
                 log.info("Step {}: Mean batch loss {}".format(step, batch_loss))
             wandb.log(
                 {
-                    "loss": batch_loss,
-                    "test_loss": avrg_test_mse
+                    "train_loss": batch_loss,
+                    "diversity_loss": diversity_loss,
+                    "accuracy_loss": accuracy_loss,
+                    "chamfer_loss": best_test_loss
                 }
             )
         self.store_model_weights(self.working_dir)
@@ -149,20 +152,23 @@ class GraspDiffusionAgent(BaseAgent):
 
 
     def evaluate_agent(self, test_loader):
-        test_mse = []
+        test_div_loss = []
+        test_acc_loss = []
         for i, tensors in enumerate(test_loader):
             points, grasp = tensors
-            # (points, grasp), success = test_loader.dataset.dataset.get_screwdriver()
-            inv_fct = test_loader.dataset.dataset.get_inverse_representation()
+            # (points, grasp), success = test_loader.dataset.get_screwdriver()
+            inv_fct = test_loader.dataset.get_inverse_representation()
 
-            obj = test_loader.dataset.dataset.processor.current_obj
+            obj = test_loader.dataset.processor.current_obj
 
-            inv_fct = test_loader.dataset.dataset.get_inverse_representation()
-            mean_mse = self.evaluate(points, grasp, inv_fct, test_loader.dataset.dataset.processor.current_obj, i)
+            inv_fct = test_loader.dataset.get_inverse_representation()
+            div_loss, acc_loss = self.evaluate(points, grasp, inv_fct, test_loader.dataset.processor.current_obj, i)
 
-            test_mse.append(mean_mse)
-        avrg_test_mse = sum(test_mse) / len(test_mse)
-        return avrg_test_mse
+            test_div_loss.append(div_loss)
+            test_acc_loss.append(acc_loss)
+        avrg_test_div_loss = np.mean(test_div_loss)
+        avrg_test_acc_loss = np.mean(test_acc_loss)
+        return avrg_test_div_loss, avrg_test_acc_loss
 
     @torch.no_grad()
     def evaluate(self, points: torch.Tensor, grasp: torch.Tensor, inv_fct, obj, i) -> float:
@@ -207,8 +213,9 @@ class GraspDiffusionAgent(BaseAgent):
                 }
             )
 
-        loss = self.validation_loss(model_pred, grasp, obj)
-        return torch.sum(loss)/len(loss)  # return batch mean control point distance
+        diversity_loss = self.validation_loss(model_pred, grasp, 'y_to_x')
+        accuracy_loss = self.validation_loss(model_pred, grasp, 'x_to_y')
+        return diversity_loss, accuracy_loss  # return batch mean control point distance
 
     @torch.no_grad()
     def predict(self, points: torch.Tensor, inv_fct) -> torch.Tensor:
@@ -258,8 +265,8 @@ class GraspDiffusionAgent(BaseAgent):
         """
         for i, tensors in enumerate(test_loader):
             points, grasp = tensors
-            # (points, grasp), success = test_loader.dataset.dataset.get_screwdriver()
-            inv_fct = test_loader.dataset.dataset.get_inverse_representation()
+            # (points, grasp), success = test_loader.dataset.get_screwdriver()
+            inv_fct = test_loader.dataset.get_inverse_representation()
             self.embedder.eval()
             self.model.eval()
 
@@ -276,7 +283,7 @@ class GraspDiffusionAgent(BaseAgent):
             colors = [[1 - i / trajectories.size(dim=1), i / trajectories.size(dim=1), 0] for i in range(trajectories.size(dim=1))]
             for traj in trajectories:
                 traj = inv_fct(traj)
-                Visualizer.visualize(test_loader.dataset.dataset.processor.current_obj, traj, colors=colors)
+                Visualizer.visualize(test_loader.dataset.processor.current_obj, traj, colors=colors)
 
 
     def load_pretrained_model(self, weights_path: str, **kwargs) -> None:

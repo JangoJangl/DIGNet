@@ -28,7 +28,7 @@ def graspnet_loss(pred, target, obj):
     ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
     control_points = torch.from_numpy(np.load(os.path.join(ROOT_DIR, 'gripper_control_points/panda.npy'))).double().cuda()
 
-    w2f = torch.from_numpy(wrist_to_finger_center()).double().cuda()  # translate COS to finger center
+    w2f = torch.from_numpy(wrist_to_finger_center()).double().cuda()  # translate COS to finger center <--- Bullshit???
     T_pred = torch.matmul(pred, w2f)
     T_target = torch.matmul(target, w2f)
 
@@ -83,7 +83,7 @@ def chamfer_loss(pred, target):
     return loss
 
 
-def chamfer_distance(x, y, metric='l2', direction='bi'):
+def trafo_chamfer_distance(x, y, direction='bi'):
     """Chamfer distance between two point clouds
 
     https://gist.github.com/sergeyprokudin/c4bf4059230da8db8256e36524993367
@@ -108,18 +108,38 @@ def chamfer_distance(x, y, metric='l2', direction='bi'):
             sum_{x_i \in x}{\min_{y_j \in y}{||x_i-y_j||**2}} + sum_{y_j \in y}{\min_{x_i \in x}{||x_i-y_j||**2}}
     """
 
+
+    #preprocess transformation
+    ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+    control_points = torch.from_numpy(np.load(os.path.join(ROOT_DIR, 'gripper_control_points/panda.npy'))).double().cuda()
+
+    points_x = torch.empty((x.shape[0], 0, control_points.shape[1])).double().cuda()
+    points_y = torch.empty((y.shape[0], 0, control_points.shape[1])).double().cuda()
+
+    for c in control_points:
+        points_x = torch.cat((points_x, torch.matmul(x, c).unsqueeze(1)), dim=1)
+        points_y = torch.cat((points_y, torch.matmul(y, c).unsqueeze(1)), dim=1)
+
+
+    x = points_x.detach().cpu().numpy()[:, :, :3]
+    y = points_y.detach().cpu().numpy()[:, :, :3]
+
+    x = x.reshape(x.shape[0], -1)
+    y = y.reshape(y.shape[0], -1)
+
+
     if direction == 'y_to_x':
-        x_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(x)
+        x_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='ball_tree', metric=gripper_dist).fit(x)
         min_y_to_x = x_nn.kneighbors(y)[0]
         chamfer_dist = np.mean(min_y_to_x)
     elif direction == 'x_to_y':
-        y_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(y)
+        y_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='ball_tree', metric=gripper_dist).fit(y)
         min_x_to_y = y_nn.kneighbors(x)[0]
         chamfer_dist = np.mean(min_x_to_y)
     elif direction == 'bi':
-        x_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(x)
+        x_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='ball_tree', metric=gripper_dist).fit(x)
         min_y_to_x = x_nn.kneighbors(y)[0]
-        y_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(y)
+        y_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='ball_tree', metric=gripper_dist).fit(y)
         min_x_to_y = y_nn.kneighbors(x)[0]
         chamfer_dist = np.mean(min_y_to_x) + np.mean(min_x_to_y)
     else:
@@ -127,3 +147,13 @@ def chamfer_distance(x, y, metric='l2', direction='bi'):
 
     return chamfer_dist
 
+def gripper_dist(x, y):
+
+    x = x.reshape((-1, 3))
+    y = y.reshape((-1, 3))
+    return np.mean(np.linalg.norm((x-y), axis=1))
+
+
+
+if __name__ == "__main__":
+    pass
