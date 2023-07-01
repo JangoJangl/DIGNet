@@ -61,7 +61,7 @@ class DiffusionGraspProcessor(object):
 
     def __get_scaler(self, scaler):
         try:
-            self.scaler = eval(f"Scaler(root_directory={self.root_directory}).{scaler}")
+            self.scaler = eval(f"Scaler(root_directory='{self.root_directory}').{scaler}")
         except AttributeError as e:
             print(e)
 
