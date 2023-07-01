@@ -36,7 +36,7 @@ class DiffusionGraspProcessor(object):
         self.__get_transform(transform)                  # COS transform applied to the object
         self.__get_scaler(scaler)                        # scale the object and grasp
         print("Preprocessor initialized")
-        
+
     def __get_representation(self, representation):
         try:
             self.representation = eval(f"Representation.{representation}")
