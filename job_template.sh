@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -p single_dev
+#SBATCH -p single
 
 # Please use the complete path details :
 #SBATCH -D /home/kit/anthropomatik/rt3040/repos/DIGNet
