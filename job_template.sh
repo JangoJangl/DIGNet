@@ -11,6 +11,8 @@
 #SBATCH -n 1                  # Number of tasks
 #SBATCH -c 4                  # Number of cores per task
 #SBATCH -t 2880               # 1:00:00 Hours, minutes and seconds, or '#SBATCH -t 10' - only minutes
+#SBATCH --gres=gpu:1
+
 
 dataset_dir
 
