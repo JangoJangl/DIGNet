@@ -78,7 +78,6 @@ pip install -e .
 pip install rtree
 
 
-
 # pip install opencv-python==4.6.0.66
 
 # Clone bet
