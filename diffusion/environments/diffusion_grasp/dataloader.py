@@ -350,6 +350,8 @@ class GraspnetAcronymDataset(Dataset):
         valid_files = []
         for idx, file in enumerate(self.file_names):
             try:
+
+                load_mesh(os.path.join(self.h5_directory, file.replace('.npz', '.h5')), self.root_directory)
                 grasps_npz = np.load(os.path.join(self.data_directory, file))
                 grasps = {}
                 for k in grasps_npz.files:
@@ -362,8 +364,8 @@ class GraspnetAcronymDataset(Dataset):
                     batches = list(zip(objects, idx_list))
                     self.batches = self.batches + batches
                     valid_files = valid_files + [file]
-            except:
-                pass
+            except Exception as e:
+                logging.warning(str(e))
         self.file_names = valid_files
 
     def get_screwdriver(self):
