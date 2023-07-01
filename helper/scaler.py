@@ -5,8 +5,7 @@ import os
 
 class Scaler(object):
 
-    def __init__(self, device='cuda'):
-        root_directory = "/home/temp_store/jandl/Dataset/acronym"
+    def __init__(self, device='cuda', root_directory='/home/temp_store/jandl/Dataset/acronym'):
         data_object = {}
         grasp_data = {}
         npz_object = np.load(os.path.join(root_directory, 'object_statistics.npz'))

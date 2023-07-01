@@ -21,7 +21,9 @@ class DiffusionGraspProcessor(object):
             rotation_factor: float = 2 * np.pi,
             use_normals: bool = False,
             use_colors: bool = False,
-            device: str = 'cuda'):
+            device: str = 'cuda',
+            root_directory: str = '/home/temp_store/jandl/Dataset/acronym'
+    ):
 
         print(f"Using {device} for processing")
         self.num_points = num_points
@@ -30,6 +32,7 @@ class DiffusionGraspProcessor(object):
         self.use_colors = use_colors
         self.device = device
         self.current_obj = None
+        self.root_directory = root_directory
 
         self.__get_representation(representation)        # representation of grasp transformation
         self.__get_sampler(sampler)                      # sampler used to sample points from mesh
@@ -58,7 +61,7 @@ class DiffusionGraspProcessor(object):
 
     def __get_scaler(self, scaler):
         try:
-            self.scaler = eval(f"Scaler().{scaler}")
+            self.scaler = eval(f"Scaler(root_directory={self.root_directory}).{scaler}")
         except AttributeError as e:
             print(e)
 

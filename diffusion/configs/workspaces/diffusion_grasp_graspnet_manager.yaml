@@ -21,6 +21,7 @@ dataset_fn:
     use_normals: ${use_normals}
     use_colors: False
     device: ${device}
+    root_directory: ${root_path}
 
 
 seed: ${seed}
