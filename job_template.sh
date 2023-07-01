@@ -14,8 +14,6 @@
 #SBATCH --gres=gpu:1
 
 
-dataset_dir
-
 echo "Copying Dataset"
 rsync --exclude "*.png" -a /home/kit/anthropomatik/rt3040/Datasets/acronym.tar.gz $TMP
 tar -xzf $TMP/acronym.tar.gz -C $TMP
