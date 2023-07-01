@@ -30,9 +30,9 @@ for  seed in "${seeds[@]}"; do
                 model_target=${network} \
                 predict_epsilon=${np} \
                 seed=${seed} \
-                root_path=$TMP/acronym \
-                data_path=$TMP/acronym/mesh_contacts_graspnet \
-                h5_path=$TMP/acronym/grasps\
+                root_path=\$TMP/acronym \
+                data_path=\$TMP/acronym/mesh_contacts_graspnet \
+                h5_path=\$TMP/acronym/grasps\
                 ">> $FOLDER_NAME/$job_name
           done
         done
