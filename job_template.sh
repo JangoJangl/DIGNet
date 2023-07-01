@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -p single
+#SBATCH -p gpu_4
 
 # Please use the complete path details :
 #SBATCH -D /home/kit/anthropomatik/rt3040/repos/DIGNet
