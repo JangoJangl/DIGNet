@@ -23,6 +23,7 @@ class DiffusionGraspProcessor(object):
             use_colors: bool = False,
             device: str = 'cuda'):
 
+        print(f"Using {device} for processing")
         self.num_points = num_points
         self.scale_factor = scale_factor
         self.use_normals = use_normals
@@ -34,7 +35,8 @@ class DiffusionGraspProcessor(object):
         self.__get_sampler(sampler)                      # sampler used to sample points from mesh
         self.__get_transform(transform)                  # COS transform applied to the object
         self.__get_scaler(scaler)                        # scale the object and grasp
-
+        print("Preprocessor initialized")
+        
     def __get_representation(self, representation):
         try:
             self.representation = eval(f"Representation.{representation}")

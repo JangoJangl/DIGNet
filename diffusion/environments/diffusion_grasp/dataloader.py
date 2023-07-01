@@ -32,7 +32,7 @@ def get_train_val(
     device="cpu",
     processor: DictConfig = None,
 ):
-
+    print("create datasets")
     processor = hydra.utils.instantiate(processor)
     files = os.listdir(data_directory)
     train_files, test_files = random_split(files, [train_fraction, 1 - train_fraction], generator=torch.Generator().manual_seed(42))
