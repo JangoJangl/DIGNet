@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import torch.functional as F
+import torch.nn.functional as F_1
 from omegaconf import DictConfig
 import hydra
 
@@ -195,17 +196,26 @@ class Diffusion(nn.Module):
         else:
             return x
 
-    def sample(self, condition, *args, **kwargs):
+    def sample(self, condition, gram_schmidt=False, *args, **kwargs):
         """
         Main Method to generate inputs conditioned on the batch of condition
         
         :param condition: the current condition for the diffusion model
+        :param gram_schmidt: bool, if the generated samples should be orthogonalized (for 6d representation)
         
         :return: x_{0} the predicted inputs from the diffusion model
         """
         batch_size = condition.shape[0]
         shape = (batch_size, self.input_dim)
         input = self.p_sample_loop(condition, shape, *args, **kwargs)
+
+        if gram_schmidt:
+                t, a1, a2 = input[..., :3], input[..., 3:6], input[..., 6:]
+                b1 = F_1.normalize(a1, dim=-1)
+                b2 = a2 - (b1 * a2).sum(-1, keepdim=True) * b1
+                b2 = F_1.normalize(b2, dim=-1)
+                input = torch.cat((t, b1, b2), dim=-1)
+
         return input.clamp_(-self.max_input, self.max_input)
     
     def guided_p_sample(self, x, t, s, fun):
@@ -290,7 +300,7 @@ class Diffusion(nn.Module):
         )
         return sample
 
-    def p_losses(self, x_start: torch.Tensor, condition: torch.Tensor, t: torch.Tensor, weights=1.0):
+    def p_losses(self, x_start: torch.Tensor, condition: torch.Tensor, t: torch.Tensor, weights=1.0, gram_schmidt=False):
         """
         Computes the training loss of the diffusion model given a batch of data. At every
         training sample of the batch we generate noisy samples at different timesteps t
@@ -309,7 +319,7 @@ class Diffusion(nn.Module):
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
 
-        x_recon = self.model(x_noisy, t, condition)
+        x_recon = self.model(x_noisy, t, condition, gram_schmidt=gram_schmidt)
 
         assert noise.shape == x_recon.shape
 
@@ -320,13 +330,13 @@ class Diffusion(nn.Module):
 
         return loss
 
-    def loss(self, x: torch.Tensor, condition: torch.Tensor, weights=1.0):
+    def loss(self, x: torch.Tensor, condition: torch.Tensor, weights=1.0, gram_schmidt=False):
         '''
         Computes the batch loss for the diffusion model
         '''
         batch_size = len(x)
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
-        return self.p_losses(x, condition, t, weights)
+        return self.p_losses(x, condition, t, weights, gram_schmidt=gram_schmidt)
 
     def forward(self, condition, *args, **kwargs):
         '''

@@ -19,6 +19,7 @@ from agents.scaler.scaler_class import Scaler
 import helper.losses as losses
 from helper.visualize import Visualizer
 from helper.collision import collision_detection, collision_detection_pc_mesh, not_in_gripper_detection_pc_mesh
+import torch.nn.functional as F
 
 # A logger for this file
 log = logging.getLogger(__name__)
@@ -57,12 +58,11 @@ class GraspDiffusionAgent(BaseAgent):
         self.visualize_paths = visualize_paths
 
     # What exactly is scaler doing?
-    def get_scaler(self, scaler: Scaler):
+    def set_processor(self, processor):
         """
         Define the scaler from the Workspace class used to scale embedding and output data if necessary
         """
-        pass
-        # self.scaler = scaler
+        self.processor = processor
 
     def set_bounds(self, size_bounds=7):
         """
@@ -90,7 +90,7 @@ class GraspDiffusionAgent(BaseAgent):
         for step in tqdm(range(self.max_train_steps)):
             # run a test batch every n steps
             if not self.steps % self.eval_every_n_steps:
-                diversity_loss, accuracy_loss = self. evaluate_agent(test_loader)
+                diversity_loss, accuracy_loss, coverage = self. evaluate_agent(test_loader)
                 log.info("Step {}: Mean diversity loss is {}".format(step, diversity_loss))
                 log.info("Step {}: Mean accuracy loss is {}".format(step, accuracy_loss))
                 if (diversity_loss+accuracy_loss) < best_test_loss:
@@ -113,7 +113,8 @@ class GraspDiffusionAgent(BaseAgent):
                     "train_loss": batch_loss,
                     "diversity_loss": diversity_loss,
                     "accuracy_loss": accuracy_loss,
-                    "chamfer_loss": best_test_loss
+                    "chamfer_loss": best_test_loss,
+                    "coverage": coverage,
                 }
             )
         self.store_model_weights(self.working_dir)
@@ -133,11 +134,15 @@ class GraspDiffusionAgent(BaseAgent):
         grasp = torch.flatten(grasp, start_dim=1)  # dim0 is batch size
         embedding = torch.flatten(embedding, start_dim=1)  # dim0 is batch size
 
+
         # embedding = self.scaler.scale_input(embedding)
         # grasp = self.scaler.scale_output(grasp)
 
         # Compute the loss.
-        loss = self.model.loss(grasp, embedding)
+        if self.processor.representation == 'rot_6d_representation':
+            loss = self.model.loss(grasp, embedding, gram_schmidt=True)
+        else:
+            loss = self.model.loss(grasp, embedding)
         # Before the backward pass, zero all the network gradients
         self.optimizer.zero_grad()
         # Backward pass: compute gradient of the loss with respect to parameters
@@ -154,6 +159,8 @@ class GraspDiffusionAgent(BaseAgent):
     def evaluate_agent(self, test_loader):
         test_div_loss = []
         test_acc_loss = []
+        test_coverage = []
+        test_coverage = []
         for i, tensors in enumerate(test_loader):
             points, grasp = tensors
             # (points, grasp), success = test_loader.dataset.get_screwdriver()
@@ -162,13 +169,15 @@ class GraspDiffusionAgent(BaseAgent):
             obj = test_loader.dataset.processor.current_obj
 
             inv_fct = test_loader.dataset.get_inverse_representation()
-            div_loss, acc_loss = self.evaluate(points, grasp, inv_fct, test_loader.dataset.processor.current_obj, i)
+            div_loss, acc_loss, coverage = self.evaluate(points, grasp, inv_fct, test_loader.dataset.processor.current_obj, i)
 
             test_div_loss.append(div_loss)
             test_acc_loss.append(acc_loss)
+            test_coverage.append(coverage)
         avrg_test_div_loss = np.mean(test_div_loss)
         avrg_test_acc_loss = np.mean(test_acc_loss)
-        return avrg_test_div_loss, avrg_test_acc_loss
+        avrg_test_coverage = np.mean(test_coverage)
+        return avrg_test_div_loss, avrg_test_acc_loss, avrg_test_coverage
 
     @torch.no_grad()
     def evaluate(self, points: torch.Tensor, grasp: torch.Tensor, inv_fct, obj, i) -> float:
@@ -191,31 +200,42 @@ class GraspDiffusionAgent(BaseAgent):
         grasp = torch.flatten(grasp, start_dim=1)  # dim0 is batch size
         global_embedding = torch.flatten(global_embedding, start_dim=1)  # dim0 is batch size
 
-        model_pred = self.model(global_embedding)
+
+        # post = self.processor.postprocess(grasp)
+        # Visualizer.render_images(obj, post[:100])
+
+        if self.processor.representation_name == 'rotation_6d_representation':
+            model_pred = self.model(global_embedding, gram_schmidt=True)
+        else:
+            model_pred = self.model(global_embedding)
+
         # apply inverse function
         model_pred = inv_fct(model_pred)
         grasp = inv_fct(grasp)
         #filtering grasp proposals
-        if self.evaluation: # or obj.metadata['file_name'] in self.visualize_paths:
+        # if self.evaluation: # or obj.metadata['file_name'] in self.visualize_paths:
 
-            idx_collsion = collision_detection_pc_mesh(model_pred[:100], torch.squeeze(points, dim=0).cpu().numpy()[:, :3])
-            idx_not_in_gripper = not_in_gripper_detection_pc_mesh(model_pred[:100], torch.squeeze(points, dim=0).cpu().numpy()[:, :3])
-            idx = torch.cat([torch.tensor(idx_collsion), torch.tensor(idx_not_in_gripper)]).unique()
-            loss_estimate = len(idx) / len(model_pred)
+            # idx_collsion = collision_detection_pc_mesh(model_pred[:100], torch.squeeze(points, dim=0).cpu().numpy()[:, :3])
+            # idx_not_in_gripper = not_in_gripper_detection_pc_mesh(model_pred[:100], torch.squeeze(points, dim=0).cpu().numpy()[:, :3])
+            # idx = torch.cat([torch.tensor(idx_collsion), torch.tensor(idx_not_in_gripper)]).unique()
+            # loss_estimate = len(idx) / len(model_pred)
 
             # if obj.metadata['file_name'] in self.visualize_paths:
             #     Visualizer.visualize(torch.squeeze(points, dim=0), grasp[:100])
             #     Visualizer.visualize(obj, model_pred[:100], bad_idx=idx)
 
-            wandb.log(
-                {
-                    f"loss_estimate_{obj.metadata['file_name']}": loss_estimate
-                }
-            )
+            # wandb.log(
+            #     {
+            #         f"loss_estimate_{obj.metadata['file_name']}": loss_estimate
+            #     }
+            # )
 
-        diversity_loss = self.validation_loss(model_pred, grasp, 'y_to_x')
+        diversity_loss, dist = self.validation_loss(model_pred, grasp, 'y_to_x', coverage=True)
+        # _, t_dist = self.validation_loss(model_pred[..., :3, 3], grasp[..., :3, 3], 'y_to_x', coverage=True)
         accuracy_loss = self.validation_loss(model_pred, grasp, 'x_to_y')
-        return diversity_loss, accuracy_loss  # return batch mean control point distance
+        coverage = torch.sum(torch.tensor(dist) < 0.25) / len(dist)
+        # t_coverage = torch.sum(t_dist < 0.05) / len(t_dist) #Todo: adjust chamfer dist to this
+        return diversity_loss, accuracy_loss, coverage #, t_coverage  # return batch mean control point distance
 
     @torch.no_grad()
     def predict(self, points: torch.Tensor, inv_fct) -> torch.Tensor:

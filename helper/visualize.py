@@ -59,6 +59,82 @@ class Visualizer(object):
         o3d.visualization.draw_geometries(scene)
 
 
+    @staticmethod
+    def render_images(objs, grasps, inverse=lambda x: x, scale=0.1, center=(0, 0, 0), colors=[], use_gripper_mesh=False,
+                  bad_idx=[]):
+
+        if isinstance(objs, Iterable) is False or isinstance(objs, torch.Tensor) is True:
+            objs = [objs]
+        scene = Visualizer.create_cos(scale, center)
+        vis = o3d.visualization.Visualizer()
+        vis.create_window(width=1000, height=1000, visible=True)
+        vis.add_geometry(scene)
+        vis.update_geometry(scene)
+        for o in objs:
+            if isinstance(o, trimesh.Trimesh):
+                obj = o.as_open3d
+                obj.compute_vertex_normals()
+                obj.paint_uniform_color([0.5, 0.5, 0.5])
+            elif isinstance(o, torch.Tensor):
+                obj = o3d.geometry.PointCloud()
+                obj.points = o3d.utility.Vector3dVector(torch.Tensor.cpu(o[:, :3]))
+                obj.paint_uniform_color([0, 0, 0])
+                obj.normals = o3d.utility.Vector3dVector(torch.Tensor.cpu(o[:, -3:]))
+            elif isinstance(o, o3d.geometry.Geometry3D):
+                obj = o
+            else:
+                raise NotImplementedError
+
+            vis.add_geometry(obj)
+            vis.update_geometry(obj)
+
+        for i, g in enumerate(grasps):
+            g = inverse(g.to('cpu'))  # transform grasp to homogenous matrix
+            # color = colors[i % len(colors)]
+            if len(colors) and len(grasps) == len(colors):
+                color = colors[i]
+
+            elif i in bad_idx:
+                color = [1, 0, 0]
+            else:
+                color = [0, 1, 0]
+            if use_gripper_mesh is True:
+                gripper = create_gripper_mesh(color)
+            else:
+                gripper = Visualizer.create_gripper_marker(color)
+            gripper = gripper.transform(g.detach()) if g.requires_grad else gripper.transform(g)
+            vis.add_geometry(gripper)
+            vis.update_geometry(gripper)
+
+
+        opt = vis.get_render_option()
+        opt.background_color = np.asarray([25.9 / 255, 57.6 / 255, 51.0 / 255])
+        opt.point_size = 9.0
+
+        zoom = 0.5
+        ctr = vis.get_view_control()
+        ctr.set_front(np.asarray([15, 0, 0.3]))
+        ctr.set_lookat(np.asarray([15, 0, 0.3]))
+        ctr.set_up(np.asarray([15, 0, 0.3]))
+        ctr.set_zoom(zoom)
+        vis.poll_events()
+        vis.update_renderer()
+        vis.capture_screen_image('/home/i53/student/jandl/repos/DIGNet/diffusion/images/test.png', False)
+        ctr.set_front([0, -5, 0.3])
+        ctr.set_lookat([0.4, 5, 0])
+        ctr.set_up([0, 0, 1])
+        ctr.set_zoom(zoom)
+        vis.poll_events()
+        vis.update_renderer()
+        vis.capture_screen_image('/home/i53/student/jandl/repos/DIGNet/diffusion/images/test_left.png', False)
+        ctr.set_front([0, 5, 0.3])
+        ctr.set_lookat([0, 0, 5])
+        ctr.set_up([0, 0, 1])
+        ctr.set_zoom(zoom)
+        vis.poll_events()
+        vis.update_renderer()
+        vis.capture_screen_image('/home/i53/student/jandl/repos/DIGNet/diffusion/images/test_right.png', False)
+        vis.destroy_window()
 
 
 

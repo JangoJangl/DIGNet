@@ -7,8 +7,8 @@ mkdir ./${FOLDER_NAME}
 
 # Declare options for hyperparameter search
 declare -a seeds=(26 42 69)
-declare -a representations=('se3_log_map_representation'  'trans_quat_representation')
-declare -a grasp_dims=(6 7)
+declare -a representations=('se3_log_map_representation'  'se3_pseudo_log_map_representation' 'rotation_6d_representation' 'trans_quat_representation')
+declare -a grasp_dims=(6 6 9 7)
 declare -a agents=(diffusion_grasp_agent diffusion_grasp_agent_vnn)
 declare -a networks=(networks.diffusion.diffusion_models.FiLMResidualMLPNetworkV2 networks.diffusion.diffusion_models.DiffusionMLPNetwork)
 declare -a noise_pred=(true false)

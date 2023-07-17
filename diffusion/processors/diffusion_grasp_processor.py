@@ -33,7 +33,7 @@ class DiffusionGraspProcessor(object):
         self.device = device
         self.current_obj = None
         self.root_directory = root_directory
-
+        self.representation_name = representation
         self.__get_representation(representation)        # representation of grasp transformation
         self.__get_sampler(sampler)                      # sampler used to sample points from mesh
         self.__get_transform(transform)                  # COS transform applied to the object

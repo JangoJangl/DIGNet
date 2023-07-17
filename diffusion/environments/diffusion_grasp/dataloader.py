@@ -13,7 +13,7 @@ import h5py
 from omegaconf import DictConfig
 import hydra
 from pytorch3d.transforms import matrix_to_euler_angles, matrix_to_quaternion
-from theseus.geometry import se3
+from theseus.geometry import se3, so3
 from helper.transform import Transform
 
 
@@ -135,8 +135,8 @@ class GraspnetAcronymDataset_old(Dataset):
                 grasp_transforms = torch.vstack((grasp_transforms, torch.from_numpy(grasps['grasp_transform']).to(self.device)))
                 grasp_contact_points = torch.vstack((grasp_contact_points, torch.from_numpy(grasps['contact_points']).to(self.device)))
                 obj_idcs = torch.cat((obj_idcs, torch.ones(grasps['grasp_transform'].shape[0], dtype=torch.int).to(self.device) * int(idx)), dim=0)
-                # if idx == 100:
-                #     break
+                if idx == 100:
+                    break
 
         return obj_idcs, grasp_transforms, grasp_contact_points
 
@@ -349,7 +349,8 @@ class GraspnetAcronymDataset(Dataset):
         valid_files = []
         for idx, file in enumerate(self.file_names):
             try:
-
+                if idx == 100:
+                    break
                 load_mesh(os.path.join(self.h5_directory, file.replace('.npz', '.h5')), self.root_directory)
                 grasps_npz = np.load(os.path.join(self.data_directory, file))
                 grasps = {}
@@ -363,6 +364,7 @@ class GraspnetAcronymDataset(Dataset):
                     batches = list(zip(objects, idx_list))
                     self.batches = self.batches + batches
                     valid_files = valid_files + [file]
+
             except Exception as e:
                 logging.warning(str(e))
         self.file_names = valid_files
@@ -400,7 +402,7 @@ class GraspnetAcronymDataset(Dataset):
         :return:
         """
         obj_data = torch.empty((0, 6), dtype=torch.get_default_dtype(), device=self.device)
-        grasp_data = torch.empty((0, 18), dtype=torch.get_default_dtype(), device=self.device)
+        grasp_data = torch.empty((0, 12), dtype=torch.get_default_dtype(), device=self.device)
         print("start object analysis")
         for file in self.file_names:
             try:
@@ -421,7 +423,7 @@ class GraspnetAcronymDataset(Dataset):
     @torch.no_grad()
     def sample_properties(self, file):
         object_data = torch.empty((0, 6), dtype=torch.get_default_dtype(), device=self.device)
-        grasp_data = torch.empty((0, 18), dtype=torch.get_default_dtype(), device=self.device)
+        grasp_data = torch.empty((0, 12), dtype=torch.get_default_dtype(), device=self.device)
         path = os.path.join(self.h5_directory, file.replace('.npz', '.h5'))
         trimesh = load_mesh(path, self.root_directory)
         grasps_npz = np.load(os.path.join(self.data_directory, file))
@@ -443,12 +445,15 @@ class GraspnetAcronymDataset(Dataset):
             t = torch.linalg.vector_norm(torch.tensor(grasps['grasp_transform'][i][:3, 3]), ord=1).to(self.device)
             t_vec = torch.tensor(grasps['grasp_transform'][i][:3, 3]).to(self.device)
             euler = matrix_to_euler_angles(grasps['grasp_transform'][i][:3, :3], "ZXZ")
-            quaternion = matrix_to_quaternion(grasps['grasp_transform'][i][:3, :3])
-            s = se3.SE3()
-            s.update(torch.unsqueeze(grasps['grasp_transform'][i][:3, :], dim=0))
-            log_map = s.log_map()
-
-            g_data = torch.hstack((w, t, t_vec, euler, quaternion, torch.squeeze(log_map)))
+            quaternion = torch.linalg.vector_norm(matrix_to_quaternion(grasps['grasp_transform'][i][:3, :3]), ord=1).to(self.device)
+            se = se3.SE3()
+            se.update(torch.unsqueeze(grasps['grasp_transform'][i][:3, :], dim=0))
+            se_3_log_map_norm = torch.linalg.vector_norm(torch.squeeze(se.log_map()), ord=1).to(self.device)
+            so = so3.SO3()
+            so.update(torch.unsqueeze(grasps['grasp_transform'][i][:3, :3], dim=0))
+            so_3_log_map_norm = torch.linalg.vector_norm(torch.squeeze(so.log_map()), ord=1).to(self.device)
+            one = torch.tensor([1]).to(self.device)
+            g_data = torch.hstack((w, t, t_vec, euler, quaternion, se_3_log_map_norm, so_3_log_map_norm, one))
             grasp_data = torch.vstack((grasp_data, torch.unsqueeze(g_data, dim=0)))
 
         ###### object data ######
@@ -498,6 +503,7 @@ class GraspnetAcronymDataset(Dataset):
 
 
 if __name__ == "__main__":
+    torch.set_default_dtype(torch.float64)
     root_directory = "/home/temp_store/jandl/Dataset/acronym"
     data_directory = "/home/temp_store/jandl/Dataset/acronym/mesh_contacts_graspnet"
     h5_directory = "/home/temp_store/jandl/Dataset/acronym/grasps"
@@ -506,7 +512,32 @@ if __name__ == "__main__":
     train_files, test_files = random_split(files, [train_fraction, 1 - train_fraction],
                                            generator=torch.Generator().manual_seed(42))
 
-    trainset = GraspnetAcronymDataset(
+    # trainset = GraspnetAcronymDataset(
+    #     root_directory,
+    #     data_directory,
+    #     h5_directory,
+    #     list(train_files),
+    #     subbatch_size=100,
+    #     device="cuda:0",
+    #     train_split=0.9,
+    #     processor = lambda x: x)
+    #
+    # testset = GraspnetAcronymDataset(
+    #     root_directory,
+    #     data_directory,
+    #     h5_directory,
+    #     list(test_files),
+    #     subbatch_size=100,
+    #     device="cuda:0",
+    #     train_split=0.9,
+    #     processor = lambda x: x,
+    #     train=False)
+    #
+    # testset[5]
+    # trainset[5]
+    #
+
+    dataset = GraspnetAcronymDataset(
         root_directory,
         data_directory,
         h5_directory,
@@ -516,22 +547,7 @@ if __name__ == "__main__":
         train_split=0.9,
         processor = lambda x: x)
 
-    testset = GraspnetAcronymDataset(
-        root_directory,
-        data_directory,
-        h5_directory,
-        list(test_files),
-        subbatch_size=100,
-        device="cuda:0",
-        train_split=0.9,
-        processor = lambda x: x,
-        train=False)
-
-    testset[5]
-    trainset[5]
-
-
-    # dataset.get_statistics()
+    dataset.get_statistics()
 
     data_object = np.load(os.path.join(root_directory, 'object_statistics.npz'))
     data_grasp = np.load(os.path.join(root_directory, 'grasp_statistics.npz'))

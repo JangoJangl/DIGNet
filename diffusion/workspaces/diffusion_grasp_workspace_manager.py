@@ -79,6 +79,12 @@ class DiffusionGraspManager(BaseWorkspaceManger):
         }
 
 
+    def get_processor(self):
+        """
+        Returns the scaler instance
+        """
+        return self.data_loaders['train'].dataset.processor
+
     def get_scaler_data(self, scaler):
         """
         Computes all necessary statistics for the scaler from dataset

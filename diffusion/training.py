@@ -40,7 +40,7 @@ def main(cfg: DictConfig) -> None:
     workspace_manager = hydra.utils.instantiate(cfg.workspaces)
     agent = hydra.utils.instantiate(cfg.agents)
     # get the scaler instance and set teh bounds for the sampler if required
-    agent.get_scaler(workspace_manager.scaler)
+    agent.set_processor(workspace_manager.get_processor())
     agent.set_bounds(cfg.grasp_dim)
 
     # train the agent

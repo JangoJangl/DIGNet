@@ -18,9 +18,10 @@ class Scaler(object):
         self.representations = {
             'trans': [1, 1, 1],
             'euler_representation': [1, 1, 1, 2, 3, 4],
-            'rotation_6d_representation': [], #Todo
-            'se3_log_map_representation': [9, 10, 11, 12, 13, 14], # is se3 logmap scaled right or do I need the vec norm?
-            'trans_quat_representation':  [1, 1, 1, 5, 6, 7, 8]
+            'rotation_6d_representation': [1, 1, 1, -1, -1, -1, -1, -1, -1],
+            'se3_log_map_representation': [9, 9, 9, 9, 9, 9],
+            'se3_pseudo_log_map_representation': [1, 1, 1, 10, 10, 10], # is se3 logmap scaled right or do I need the vec norm?
+            'trans_quat_representation':  [1, 1, 1, 8, 8, 8, 8]
         }
 
 
@@ -29,6 +30,9 @@ class Scaler(object):
         self.grasp_var = torch.from_numpy(grasp_data["var"]).to(device)
         self.grasp_min = torch.from_numpy(grasp_data["min"]).to(device)
         self.grasp_max = torch.from_numpy(grasp_data["max"]).to(device)
+
+        self.grasp_var[-1] = torch.tensor(1.0)
+        self.grasp_var[8] = torch.tensor(1.0)
 
     def min_max_scale(self, obj, grasps, representation='trans_quat_representation'):
         """ Scales the object and the grasps by min and max values
@@ -63,6 +67,16 @@ class Scaler(object):
 
         return obj, grasps, inverse
 
+
+    def no_scale(self, obj, grasps, representation='trans_quat_representation'):
+        """ Scales the object and the grasps by mean and variance
+        :param obj: Torch.tensor
+        :param grasps: Torch.tensor
+        """
+        def inverse(g):
+            return g
+
+        return obj, grasps, inverse
 
 
 def min_max_norm(tensor):

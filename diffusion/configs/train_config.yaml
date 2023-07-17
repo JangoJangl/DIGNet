@@ -21,8 +21,8 @@ seed: 42
 window_size: 1
 
 #grasp_dims: rot_6d -> 9, se3, -> 16, log_map -> 6, trans_quat -> 7
-representation: 'se3_log_map_representation' # 'trans_quat_representation' ,rotation_6d_representation
-grasp_dim: 6
+representation: 'rotation_6d_representation' # 'se3_log_map_representation' # 'trans_quat_representation' ,rotation_6d_representation
+grasp_dim: 9
 pc_dim: 1024 # pointnet currently works just for 1024 points
 use_normals: false
 embedding_dim: 1023 # just global embedding has to be a multiple of 3

@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import pytorch3d.transforms as p3d_t
-from theseus.geometry import se3
+from theseus.geometry import se3, so3
 
 
 class Representation(object):
@@ -29,7 +29,21 @@ class Representation(object):
         inverse_transform = Representation.__se3_log_map_inverse_representation
 
         return grasps, inverse_transform
+    @staticmethod
+    def se3_pseudo_log_map_representation(grasps, device='cuda'):
+        """In the SE(3) logarithmic representation SE(3) matrices
+        are represented as 6-dimensional vectors [translation | log_rotation],
+        i.e. a concatenation of two 3D vectors log_translation and log_rotation."""
 
+        translation = grasps[:, :3, 3].to(device)
+        rotation = grasps[:, :3, :3].to(device)
+
+        so3_grasps = so3.SO3(dtype=torch.get_default_dtype())
+        so3_grasps.update(rotation)
+        grasps = torch.cat(translation, so3_grasps.log_map(), dim=1)
+        inverse_transform = Representation.__so3_log_map_inverse_representation
+
+        return grasps, inverse_transform
 
 
     @staticmethod
@@ -78,4 +92,15 @@ class Representation(object):
 
         se3_tensor = se3.SE3.exp_map(tensor)
         return se3_tensor.to_matrix()
+
+    @staticmethod
+    def __so3_log_map_inverse_representation(tensor):
+        translation = tensor[:, :3]
+        so3_vec = tensor[:, 3:]
+        rotation = so3.SO3.exp_map(so3_vec)
+        transform = torch.repeat_interleave(torch.from_numpy(np.eye(4)).unsqueeze(0), len(tensor), dim=0).to(
+            'cuda')
+        transform[:, :3, :3] = rotation.to_matrix()
+        transform[:, :3, 3] = translation
+        return transform
 

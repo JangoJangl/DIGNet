@@ -83,7 +83,7 @@ def chamfer_loss(pred, target):
     return loss
 
 
-def trafo_chamfer_distance(x, y, direction='bi'):
+def trafo_chamfer_distance(x, y, direction='bi', coverage=False):
     """Chamfer distance between two point clouds
 
     https://gist.github.com/sergeyprokudin/c4bf4059230da8db8256e36524993367
@@ -120,7 +120,7 @@ def trafo_chamfer_distance(x, y, direction='bi'):
         points_x = torch.cat((points_x, torch.matmul(x, c).unsqueeze(1)), dim=1)
         points_y = torch.cat((points_y, torch.matmul(y, c).unsqueeze(1)), dim=1)
 
-
+    # cut off one of homogeneous coordinates
     x = points_x.detach().cpu().numpy()[:, :, :3]
     y = points_y.detach().cpu().numpy()[:, :, :3]
 
@@ -130,12 +130,12 @@ def trafo_chamfer_distance(x, y, direction='bi'):
 
     if direction == 'y_to_x':
         x_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='ball_tree', metric=gripper_dist).fit(x)
-        min_y_to_x = x_nn.kneighbors(y)[0]
-        chamfer_dist = np.mean(min_y_to_x)
+        dist = x_nn.kneighbors(y)[0]
+        chamfer_dist = np.mean(dist)
     elif direction == 'x_to_y':
         y_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='ball_tree', metric=gripper_dist).fit(y)
-        min_x_to_y = y_nn.kneighbors(x)[0]
-        chamfer_dist = np.mean(min_x_to_y)
+        dist= y_nn.kneighbors(x)[0]
+        chamfer_dist = np.mean(dist)
     elif direction == 'bi':
         x_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='ball_tree', metric=gripper_dist).fit(x)
         min_y_to_x = x_nn.kneighbors(y)[0]
@@ -144,8 +144,10 @@ def trafo_chamfer_distance(x, y, direction='bi'):
         chamfer_dist = np.mean(min_y_to_x) + np.mean(min_x_to_y)
     else:
         raise ValueError("Invalid direction type. Supported types: \'y_x\', \'x_y\', \'bi\'")
-
-    return chamfer_dist
+    if coverage:
+        return chamfer_dist, dist
+    else:
+        return chamfer_dist
 
 def gripper_dist(x, y):
 
