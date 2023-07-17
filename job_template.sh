@@ -17,6 +17,8 @@
 echo "Copying Dataset"
 rsync --exclude "*.png" -a /home/kit/anthropomatik/rt3040/Datasets/acronym.tar.gz $TMP
 tar -xzf $TMP/acronym.tar.gz -C $TMP
+rsync --exclude "*.png" -a /home/kit/anthropomatik/rt3040/Datasets/grasp_statistics.npz $TMP/acronym
+rsync --exclude "*.png" -a /home/kit/anthropomatik/rt3040/Datasets/object_statistics.npz $TMP/acronym
 
 echo "===================================="
 echo "TMP Directory:"
