@@ -213,22 +213,22 @@ class GraspDiffusionAgent(BaseAgent):
         model_pred = inv_fct(model_pred)
         grasp = inv_fct(grasp)
         #filtering grasp proposals
-        # if self.evaluation: # or obj.metadata['file_name'] in self.visualize_paths:
+        if self.evaluation: # or obj.metadata['file_name'] in self.visualize_paths:
 
-            # idx_collsion = collision_detection_pc_mesh(model_pred[:100], torch.squeeze(points, dim=0).cpu().numpy()[:, :3])
-            # idx_not_in_gripper = not_in_gripper_detection_pc_mesh(model_pred[:100], torch.squeeze(points, dim=0).cpu().numpy()[:, :3])
-            # idx = torch.cat([torch.tensor(idx_collsion), torch.tensor(idx_not_in_gripper)]).unique()
-            # loss_estimate = len(idx) / len(model_pred)
+            idx_collsion = collision_detection_pc_mesh(model_pred[:100], torch.squeeze(points, dim=0).cpu().numpy()[:, :3])
+            idx_not_in_gripper = not_in_gripper_detection_pc_mesh(model_pred[:100], torch.squeeze(points, dim=0).cpu().numpy()[:, :3])
+            idx = torch.cat([torch.tensor(idx_collsion), torch.tensor(idx_not_in_gripper)]).unique()
+            loss_estimate = len(idx) / len(model_pred)
 
-            # if obj.metadata['file_name'] in self.visualize_paths:
-            #     Visualizer.visualize(torch.squeeze(points, dim=0), grasp[:100])
-            #     Visualizer.visualize(obj, model_pred[:100], bad_idx=idx)
+            if obj.metadata['file_name'] in self.visualize_paths:
+                Visualizer.visualize(torch.squeeze(points, dim=0), grasp[:100])
+                Visualizer.visualize(obj, model_pred[:100], bad_idx=idx)
 
-            # wandb.log(
-            #     {
-            #         f"loss_estimate_{obj.metadata['file_name']}": loss_estimate
-            #     }
-            # )
+            wandb.log(
+                {
+                    f"loss_estimate_{obj.metadata['file_name']}": loss_estimate
+                }
+            )
 
         diversity_loss, dist = self.validation_loss(model_pred, grasp, 'y_to_x', coverage=True)
         # _, t_dist = self.validation_loss(model_pred[..., :3, 3], grasp[..., :3, 3], 'y_to_x', coverage=True)
