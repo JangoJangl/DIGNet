@@ -319,7 +319,7 @@ class Diffusion(nn.Module):
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
 
-        x_recon = self.model(x_noisy, t, condition, gram_schmidt=gram_schmidt)
+        x_recon = self.model(x_noisy, t, condition)
 
         assert noise.shape == x_recon.shape
 
