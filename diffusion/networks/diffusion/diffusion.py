@@ -338,7 +338,7 @@ class Diffusion(nn.Module):
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
         return self.p_losses(x, condition, t, weights, gram_schmidt=gram_schmidt)
 
-    def forward(self, condition, *args, **kwargs):
+    def forward(self, condition, gram_schmidt=False, *args, **kwargs):
         '''
         General forward method, which generates samples given the chosen condition
         '''
