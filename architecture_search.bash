@@ -6,24 +6,26 @@ rm -rf ./${FOLDER_NAME}
 mkdir ./${FOLDER_NAME}
 
 # Declare options for hyperparameter search
-declare -a seeds=(26 42 69)
+declare -a seeds=(69)
 declare -a representations=('se3_log_map_representation'  'se3_pseudo_log_map_representation' 'rotation_6d_representation' 'trans_quat_representation')
 declare -a grasp_dims=(6 6 9 7)
-declare -a agents=(diffusion_grasp_agent diffusion_grasp_agent_vnn)
-declare -a networks=(networks.diffusion.diffusion_models.FiLMResidualMLPNetworkV2 networks.diffusion.diffusion_models.DiffusionMLPNetwork)
+declare -a agents=(diffusion_grasp_agent_vnn)
+declare -a networks=(networks.diffusion.diffusion_models.DiffusionMLPNetwork)
 declare -a noise_pred=(true false)
+declare -a scales=('var_scale' 'no_scale')
+declare -a radii=(0.01 0.02 0.05 0.1)
 
 arraylength=${#representations[@]}
 # Read the array values with space
-for  seed in "${seeds[@]}"; do
+for  radius in "${radii[@]}"; do
   for (( i=0; i<${arraylength}; i++ )); do
-    for agent in "${agents[@]}"; do
-      for network in "${networks[@]}"; do
+    for scale in "${scales[@]}"; do
         for np in "${noise_pred[@]}"; do
-          declare job_name="job_${representations[$i]}_${grasp_dims[$i]}_${agent}_${network}_${np}_${seed}.sh"
+          declare job_name="job_${representations[$i]}_${grasp_dims[$i]}_${scale}_${radius}.sh"
           cp job_template.sh $FOLDER_NAME/$job_name
           sed -i "3i#SBATCH -J ${job_name}" $FOLDER_NAME/$job_name
           echo "python diffusion/training.py \
+                group='${representations[$i]}' \
                 representation='${representations[$i]}' \
                 grasp_dim=${grasp_dims[$i]} \
                 agents=${agent} \
@@ -35,7 +37,6 @@ for  seed in "${seeds[@]}"; do
                 h5_path=\$TMP/acronym/grasps\
                 ">> $FOLDER_NAME/$job_name
           done
-        done
     done
   done
 done

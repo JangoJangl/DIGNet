@@ -17,13 +17,13 @@ class Sampler(object):
         :return: Torch tensor of shape (batch_size, 3 + len(features))
         """
         idcs = np.random.choice(len(obj.vertices), num_points, replace=False)
-        pos = torch.tensor(obj.vertices, dtype=torch.float, device=device)[idcs]
-        features = torch.empty((num_points, 0), dtype=torch.float, device=device)
+        pos = torch.tensor(obj.vertices, device=device)[idcs]
+        features = torch.empty((num_points, 0), device=device)
         if use_colors:
-            colors = torch.tensor(obj.visual.vertex_colors, dtype=torch.float, device=device)[idcs][:, 0:3] / 255
+            colors = torch.tensor(obj.visual.vertex_colors, device=device)[idcs][:, 0:3] / 255
             features = torch.cat((features, colors), dim=1)
         if use_normals:
-            normals = torch.tensor(obj.vertex_normals, dtype=torch.float, device=device)[idcs]
+            normals = torch.tensor(obj.vertex_normals, device=device)[idcs]
             features = torch.cat((features, normals), dim=1)
 
         return torch.cat((pos, features), dim=1)
@@ -44,11 +44,11 @@ class Sampler(object):
         o3d_pc = obj.mesh_o3d.sample_points_uniformly(num_points)
         if use_normals:
             assert o3d_pc.has_normals()
-            normals = torch.tensor(o3d_pc.normals, dtype=torch.float, device=device)
+            normals = torch.tensor(o3d_pc.normals, device=device)
         else:
-            normals = torch.empty((num_points, 0), dtype=torch.float, device=device)
-        color = torch.tensor(o3d_pc.colors, dtype=torch.float, device=device)
-        pos = torch.tensor(o3d_pc.points, dtype=torch.float, device=device)
+            normals = torch.empty((num_points, 0), device=device)
+        color = torch.tensor(o3d_pc.colors, device=device)
+        pos = torch.tensor(o3d_pc.points, device=device)
 
         return torch.cat((pos, color, normals), dim=1)
 
@@ -68,8 +68,8 @@ class Sampler(object):
             if isinstance(obj, trimesh.Trimesh):
                 o3d_obj = obj.to_o3d()
             samples = o3d_obj.sample_points_poisson_disk(number_of_points=num_points, init_factor=4)
-            pos = torch.tensor(samples, dtype=torch.float, device=device)
-            features = torch.empty((num_points, 0), dtype=torch.float, device=device)
+            pos = torch.tensor(samples, device=device)
+            features = torch.empty((num_points, 0), device=device)
             ##### use coolors and use_normals does not work becuase method switched from trimesh to open3d ####
             # if use_colors:
             #     colors = torch.tensor(obj.visual.face_colors[face_idcs][:, 0:3] / 255, dtype=torch.float, device=device)

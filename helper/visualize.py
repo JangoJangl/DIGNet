@@ -61,7 +61,7 @@ class Visualizer(object):
 
     @staticmethod
     def render_images(objs, grasps, inverse=lambda x: x, scale=0.1, center=(0, 0, 0), colors=[], use_gripper_mesh=False,
-                  bad_idx=[]):
+                  bad_idx=[], image_name="image"):
 
         if isinstance(objs, Iterable) is False or isinstance(objs, torch.Tensor) is True:
             objs = [objs]
@@ -119,21 +119,7 @@ class Visualizer(object):
         ctr.set_zoom(zoom)
         vis.poll_events()
         vis.update_renderer()
-        vis.capture_screen_image('/home/i53/student/jandl/repos/DIGNet/diffusion/images/test.png', False)
-        ctr.set_front([0, -5, 0.3])
-        ctr.set_lookat([0.4, 5, 0])
-        ctr.set_up([0, 0, 1])
-        ctr.set_zoom(zoom)
-        vis.poll_events()
-        vis.update_renderer()
-        vis.capture_screen_image('/home/i53/student/jandl/repos/DIGNet/diffusion/images/test_left.png', False)
-        ctr.set_front([0, 5, 0.3])
-        ctr.set_lookat([0, 0, 5])
-        ctr.set_up([0, 0, 1])
-        ctr.set_zoom(zoom)
-        vis.poll_events()
-        vis.update_renderer()
-        vis.capture_screen_image('/home/i53/student/jandl/repos/DIGNet/diffusion/images/test_right.png', False)
+        vis.capture_screen_image(f"/home/i53/student/jandl/repos/DIGNet/diffusion/images/{image_name}.png", False)
         vis.destroy_window()
 
 

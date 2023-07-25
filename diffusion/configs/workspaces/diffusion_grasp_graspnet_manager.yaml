@@ -15,7 +15,7 @@ dataset_fn:
     representation: ${representation} #'trans_quat_representation'  # ,rotation_6d_representation
     sampler: 'poisson_disk_sample' # 'random_vertex_sample' #
     transform: 'center_transform'
-    scaler: 'var_scale'
+    scaler: ${scaler}
     scale_factor: 1
     num_points: ${pc_dim}
     use_normals: ${use_normals}

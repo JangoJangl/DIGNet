@@ -21,9 +21,9 @@ seed: 42
 window_size: 1
 
 #grasp_dims: rot_6d -> 9, se3, -> 16, log_map -> 6, trans_quat -> 7
-representation: 'rotation_6d_representation' # 'se3_log_map_representation' # 'trans_quat_representation' ,rotation_6d_representation
-grasp_dim: 9
-pc_dim: 1024 # pointnet currently works just for 1024 points
+representation: 'se3_pseudo_log_map_representation' # 'se3_log_map_representation' # 'trans_quat_representation' ,rotation_6d_representation
+grasp_dim: 6
+pc_dim: 4096 # pointnet currently works just for 1024 points
 use_normals: false
 embedding_dim: 1023 # just global embedding has to be a multiple of 3
 t_dim: 16
@@ -50,22 +50,23 @@ update_ema_every_n_steps: 1
 
 # diffusion hyper params
 activation: "Mish"
-n_timesteps: 15
+n_timesteps: 8
 beta_schedule: 'cosine'
 diffusion_x: false
-diffusion_x_M: 32
+diffusion_x_M: 5
 diffusion_kde: false
 diffusion_kde_samples: 100
 use_ema: false
 
 model_target: networks.diffusion.diffusion_models.FiLMResidualMLPNetworkV2
-predict_epsilon: false
+predict_epsilon: true
+scaler: 'no_scale'
 
 # evaluation params
 
-evaluation: False
-pretrained_model_path: "/home/i53/student/jandl/repos/DIGNet/diffusion/logs/grasping_end_to_end_learning/runs/2023-06-07/19-28-40"
-visualize_paths: ['f1c5b9bb744afd96d6e1954365b10b52.obj', '1f6a7f3705d791762c91206be77753e3.obj', '1ab3abb5c090d9b68e940c4e64a94e1e.obj', '13af92fb42fdc0d774d5a6a8a8e5a2e.obj', ]
+evaluation: false
+pretrained_model_path: "/home/i53/student/jandl/repos/DIGNet/logs/cluster/grasping_end_to_end_learning/runs/2023-07-22/23-55-20_architecture_optimization"
+visualize_paths: ['f1c5b9bb744afd96d6e1954365b10b52.obj', '1f6a7f3705d791762c91206be77753e3.obj', '1ab3abb5c090d9b68e940c4e64a94e1e.obj', '13af92fb42fdc0d774d5a6a8a8e5a2e.obj']
 
 
 hydra:

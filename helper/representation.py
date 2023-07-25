@@ -40,7 +40,7 @@ class Representation(object):
 
         so3_grasps = so3.SO3(dtype=torch.get_default_dtype())
         so3_grasps.update(rotation)
-        grasps = torch.cat(translation, so3_grasps.log_map(), dim=1)
+        grasps = torch.cat((translation, so3_grasps.log_map()), dim=1)
         inverse_transform = Representation.__so3_log_map_inverse_representation
 
         return grasps, inverse_transform

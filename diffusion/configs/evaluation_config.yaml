@@ -64,5 +64,5 @@ use_ema: false
 # evaluation params
 
 evaluation: True
-pretrained_model_path: "/home/i53/student/jandl/repos/DIGNet/diffusion/logs/grasping_end_to_end_learning/runs/2023-06-07/19-28-40"
+pretrained_model_path: "/home/i53/student/jandl/repos/DIGNet/logs/cluster/grasping_end_to_end_learning/runs/2023-07-22/23-55-20_architecture_optimization"
 visualize_paths: ['f1c5b9bb744afd96d6e1954365b10b52.obj', '1f6a7f3705d791762c91206be77753e3.obj', '1ab3abb5c090d9b68e940c4e64a94e1e.obj', '13af92fb42fdc0d774d5a6a8a8e5a2e.obj', ]
