@@ -28,10 +28,9 @@ for  radius in "${radii[@]}"; do
                 group='${representations[$i]}' \
                 representation='${representations[$i]}' \
                 grasp_dim=${grasp_dims[$i]} \
-                agents=${agent} \
-                model_target=${network} \
                 predict_epsilon=${np} \
-                seed=${seed} \
+                scaler='${scale}' \
+                pointnet_radius=${radius} \
                 root_path=\$TMP/acronym \
                 data_path=\$TMP/acronym/mesh_contacts_graspnet \
                 h5_path=\$TMP/acronym/grasps\
