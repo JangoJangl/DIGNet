@@ -60,8 +60,8 @@ class Visualizer(object):
 
 
     @staticmethod
-    def render_images(objs, grasps, inverse=lambda x: x, scale=0.1, center=(0, 0, 0), colors=[], use_gripper_mesh=False,
-                  bad_idx=[], image_name="image"):
+    def render_image(objs, grasps, inverse=lambda x: x, scale=0.1, center=(0, 0, 0), colors=[], use_gripper_mesh=False,
+                  bad_idx=[], path="image.png"):
 
         if isinstance(objs, Iterable) is False or isinstance(objs, torch.Tensor) is True:
             objs = [objs]
@@ -108,18 +108,17 @@ class Visualizer(object):
 
 
         opt = vis.get_render_option()
-        opt.background_color = np.asarray([25.9 / 255, 57.6 / 255, 51.0 / 255])
+        opt.background_color = np.asarray([1,1,1])
         opt.point_size = 9.0
 
         zoom = 0.5
         ctr = vis.get_view_control()
-        ctr.set_front(np.asarray([15, 0, 0.3]))
-        ctr.set_lookat(np.asarray([15, 0, 0.3]))
-        ctr.set_up(np.asarray([15, 0, 0.3]))
-        ctr.set_zoom(zoom)
+
+        ctr.scale(0.5)
+        ctr.rotate(5, 0)
         vis.poll_events()
         vis.update_renderer()
-        vis.capture_screen_image(f"/home/i53/student/jandl/repos/DIGNet/diffusion/images/{image_name}.png", False)
+        vis.capture_screen_image(path, False)
         vis.destroy_window()
 
 

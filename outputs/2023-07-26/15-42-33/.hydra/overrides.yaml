@@ -1,0 +1,4 @@
+- pretrained_model_path=/home/i53/student/jandl/repos/DIGNet/logs/cluster/grasping_end_to_end_learning/runs/2023-07-22/12-45-59_architecture_optimization
+- root_path=/home/temp_store/jandl/Dataset/acronym
+- data_path=/home/temp_store/jandl/Dataset/acronym/mesh_contacts_graspnet
+- h5_path=/home/temp_store/jandl/Dataset/acronym/grasps

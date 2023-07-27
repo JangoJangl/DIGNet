@@ -16,7 +16,10 @@ class Sampler(object):
         :param num_points: Number of points to sample
         :return: Torch tensor of shape (batch_size, 3 + len(features))
         """
-        idcs = np.random.choice(len(obj.vertices), num_points, replace=False)
+        try:
+            idcs = np.random.choice(len(obj.vertices), num_points, replace=False)
+        except:
+            idcs = np.random.choice(len(obj.vertices), num_points, replace=True)
         pos = torch.tensor(obj.vertices, device=device)[idcs]
         features = torch.empty((num_points, 0), device=device)
         if use_colors:
@@ -66,9 +69,9 @@ class Sampler(object):
 
             # samples, face_idcs = trimesh.sample.sample_surface_even(obj, num_points)
             if isinstance(obj, trimesh.Trimesh):
-                o3d_obj = obj.to_o3d()
+                o3d_obj = obj.as_open3d
             samples = o3d_obj.sample_points_poisson_disk(number_of_points=num_points, init_factor=4)
-            pos = torch.tensor(samples, device=device)
+            pos = torch.tensor(np.asarray(samples.points), device=device)
             features = torch.empty((num_points, 0), device=device)
             ##### use coolors and use_normals does not work becuase method switched from trimesh to open3d ####
             # if use_colors:

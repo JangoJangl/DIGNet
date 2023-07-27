@@ -157,7 +157,7 @@ class GraspDiffusionAgent(BaseAgent):
         return loss
 
 
-    def evaluate_agent(self, test_loader):
+    def evaluate_agent(self, test_loader, path=None):
         test_div_loss = []
         test_acc_loss = []
         test_gripper_check_loss = []
@@ -169,7 +169,7 @@ class GraspDiffusionAgent(BaseAgent):
             obj = test_loader.dataset.processor.current_obj
 
             inv_fct = self.processor.postprocess
-            div_loss, acc_loss, coverage, gripper_check_loss = self.evaluate(points, grasp, inv_fct, test_loader.dataset.processor.current_obj, i, gripper_check=gripper_check)
+            div_loss, acc_loss, coverage, gripper_check_loss = self.evaluate(points, grasp, inv_fct, test_loader.dataset.processor.current_obj, i, gripper_check=gripper_check, path=path)
 
             test_div_loss.append(div_loss)
             test_acc_loss.append(acc_loss)
@@ -183,7 +183,7 @@ class GraspDiffusionAgent(BaseAgent):
         return avrg_test_div_loss, avrg_test_acc_loss, avrg_test_coverage, avrg_test_gripper_check_loss
 
     @torch.no_grad()
-    def evaluate(self, points: torch.Tensor, grasp: torch.Tensor, inv_fct, obj, i, gripper_check=False) -> float:
+    def evaluate(self, points: torch.Tensor, grasp: torch.Tensor, inv_fct, obj, i, gripper_check=False, path=None) -> float:
 
         # scale data if necessarry, otherwise the scaler will return unchanged values
         # embedding = self.scaler.scale_input(embedding)
@@ -217,18 +217,16 @@ class GraspDiffusionAgent(BaseAgent):
         grasp = inv_fct(grasp)
         #filtering grasp proposals
         if gripper_check: # or obj.metadata['file_name'] in self.visualize_paths:
-            if len(model_pred) < 10:
+            if len(model_pred) < 40:
                 mps = model_pred
             else:
-                mps = model_pred[:10]
+                mps = model_pred[:40]
             idx_collsion = collision_detection_pc_mesh(mps, torch.squeeze(points, dim=0).cpu().numpy()[:, :3])
             idx_not_in_gripper = not_in_gripper_detection_pc_mesh(mps, torch.squeeze(points, dim=0).cpu().numpy()[:, :3])
             idx = torch.cat([torch.tensor(idx_collsion), torch.tensor(idx_not_in_gripper)]).unique()
             gripper_check_loss = len(idx) / len(mps)
 
-            if obj.metadata['file_name'] in self.visualize_paths:
-                Visualizer.visualize(torch.squeeze(points, dim=0), grasp[:100])
-                Visualizer.visualize(obj, model_pred[:100], bad_idx=idx)
+            Visualizer.render_image(obj, mps, bad_idx=idx, path=f"{path}/{i}.png")
         else:
             gripper_check_loss = None
 
@@ -280,7 +278,35 @@ class GraspDiffusionAgent(BaseAgent):
 
         return model_pred  # .cpu().numpy()
 
-    def visualize_trajectory(self, test_loader, num_trajectories=1):
+    def visualize_trajectory_forward(self, loader, num_obj=1, num_samples=10):
+        for i, tensors in enumerate(loader):
+            if i >= num_obj:
+                break
+            points, grasp = tensors
+            # (points, grasp), success = test_loader.dataset.get_screwdriver()
+            inv_fct = loader.dataset.processor.postprocess
+            self.embedder.eval()
+            self.model.eval()
+            grasp = torch.squeeze(grasp)
+            noise = torch.randn_like(grasp).to(self.device)
+            for t_step in range(self.model.n_timesteps):
+
+                t = torch.ones(len(grasp), dtype=torch.int64).to(self.device) * t_step
+
+                g_t = self.model.q_sample(grasp, t, noise)
+
+
+                if self.processor.representation_name == 'rotation_6d_representation':
+                    t, a1, a2 = g_t[..., :3], g_t[..., 3:6], g_t[..., 6:]
+                    b1 = F.normalize(a1, dim=-1)
+                    b2 = a2 - (b1 * a2).sum(-1, keepdim=True) * b1
+                    b2 = F.normalize(b2, dim=-1)
+                    g_t = torch.cat((t, b1, b2), dim=-1)
+
+                Visualizer.visualize(loader.dataset.processor.current_obj, inv_fct(g_t))
+
+
+    def visualize_trajectory_backward(self, test_loader, num_obj=1, num_samples=10):
         """
         Visualize the trajectory of the denoising process
         :param obj:
@@ -289,7 +315,7 @@ class GraspDiffusionAgent(BaseAgent):
         for i, tensors in enumerate(test_loader):
             points, grasp = tensors
             # (points, grasp), success = test_loader.dataset.get_screwdriver()
-            inv_fct = test_loader.dataset.get_inverse_representation()
+            inv_fct = test_loader.dataset.processor.postprocess
             self.embedder.eval()
             self.model.eval()
 
@@ -307,6 +333,34 @@ class GraspDiffusionAgent(BaseAgent):
             for traj in trajectories:
                 traj = inv_fct(traj)
                 Visualizer.visualize(test_loader.dataset.processor.current_obj, traj, colors=colors)
+
+    def visualize_diffused_distribution(self, loader, num_steps=5, num_obj=1, num_samples=100):
+
+        for i, tensors in enumerate(loader):
+            if i >= num_obj:
+                break
+            points, grasp = tensors
+            # (points, grasp), success = test_loader.dataset.get_screwdriver()
+            inv_fct = loader.dataset.processor.postprocess
+            self.embedder.eval()
+            self.model.eval()
+            grasp = torch.squeeze(grasp)
+            noise = torch.randn_like(grasp).to(self.device)
+            for t_step in range(num_steps):
+
+                t = torch.ones(len(grasp), dtype=torch.int64).to(self.device) * t_step
+
+                g_t = self.model.q_sample(grasp, t, noise)
+
+
+                if self.processor.representation_name == 'rotation_6d_representation':
+                    t, a1, a2 = g_t[..., :3], g_t[..., 3:6], g_t[..., 6:]
+                    b1 = F.normalize(a1, dim=-1)
+                    b2 = a2 - (b1 * a2).sum(-1, keepdim=True) * b1
+                    b2 = F.normalize(b2, dim=-1)
+                    g_t = torch.cat((t, b1, b2), dim=-1)
+
+                Visualizer.visualize(loader.dataset.processor.current_obj, inv_fct(g_t))
 
 
     def load_pretrained_model(self, weights_path: str, **kwargs) -> None:

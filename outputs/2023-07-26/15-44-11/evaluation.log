@@ -1,0 +1,2 @@
+[2023-07-26 15:44:20,308][agents.base_agent][INFO] - The model has a total amount of 3723398 parameters
+[2023-07-26 15:44:21,727][agents.diffusion_agents.grasp_diffusion_agent][INFO] - Loaded pre-trained model parameters

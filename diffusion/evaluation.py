@@ -6,6 +6,7 @@ import wandb
 from omegaconf import DictConfig, OmegaConf, open_dict
 import torch
 import numpy as np
+from csv import writer
 
 
 log = logging.getLogger(__name__)
@@ -22,6 +23,19 @@ def main(cfg: DictConfig) -> None:
 
     with open_dict(cfg):
         cfg.pretrained_model_path = "/home/i53/student/jandl/repos/DIGNet/logs/cluster/grasping_end_to_end_learning/runs/2023-07-22/00-10-25_architecture_optimization"
+
+    # if cfg.pretrained_model_path is not None:
+    #     root_path = cfg.root_path
+    #     data_path = cfg.data_path
+    #     h5_path = cfg.h5_path
+    #     pre_trained_model_path = cfg.pretrained_model_path
+    #     cfg = OmegaConf.load(cfg.pretrained_model_config)
+    #     cfg.root_path = root_path
+    #     cfg.data_path = data_path
+    #     cfg.h5_path = h5_path
+    #     cfg.pretrained_model_path = pre_trained_model_path
+    #     cfg.group = cfg.group + "_eval"
+
 
     np.random.seed(cfg.seed)
     torch.manual_seed(cfg.seed)
@@ -51,13 +65,26 @@ def main(cfg: DictConfig) -> None:
     #     num_trajectories=3
     # )
     # eval the agent
-    diversity_loss, accuracy_loss, coverage = agent.evaluate_agent(workspace_manager.data_loaders['test'])
+    # agent.visualize_diffused_distribution(workspace_manager.data_loaders['test'], num_steps=5, num_obj=1, num_samples=100)
+    # agent.visualize_forward_trajectory(workspace_manager.data_loaders['test'], num_obj=1, num_samples=10)
+    # agent.visualize_backward_trajectory(workspace_manager.data_loaders['test'], num_obj=1, num_samples=10)
+    diversity_loss, accuracy_loss, coverage, gripper_check_loss = agent.evaluate_agent(workspace_manager.data_loaders['train'], path=cfg.pretrained_model_path)
     print(f"precision-CD: {accuracy_loss}")
     print(f"coverage-CD: {diversity_loss}")
     print(f"coverage: {coverage}")
-    print(f"gripper check accuracy: ")
+    print(f"gripper check accuracy:  {gripper_check_loss}")
     log.info("done")
 
+
+
+    row = [cfg.representation, cfg.pointnet_radius, cfg.scaler, cfg.predict_epsilon, accuracy_loss, diversity_loss, coverage, gripper_check_loss]
+
+    with open('/home/i53/student/jandl/repos/DIGNet/diffusion/eval_table.csv', 'a') as f_object:
+
+        np.savetxt(f_object, [row], fmt="%s", delimiter=' & ', newline='\\\\\n')
+
+        # Close the file object
+        f_object.close()
 
 if __name__ == "__main__":
     main()

@@ -349,8 +349,8 @@ class GraspnetAcronymDataset(Dataset):
         valid_files = []
         for idx, file in enumerate(self.file_names):
             try:
-                # if idx == 100:
-                #     break
+                if idx == 100:
+                    break
                 load_mesh(os.path.join(self.h5_directory, file.replace('.npz', '.h5')), self.root_directory)
                 grasps_npz = np.load(os.path.join(self.data_directory, file))
                 grasps = {}
