@@ -226,7 +226,7 @@ class GraspDiffusionAgent(BaseAgent):
             idx = torch.cat([torch.tensor(idx_collsion), torch.tensor(idx_not_in_gripper)]).unique()
             gripper_check_loss = len(idx) / len(mps)
 
-            Visualizer.render_image(obj, mps, bad_idx=idx, path=f"{path}/{i}.png")
+            # Visualizer.render_image(obj, mps, bad_idx=idx, path=f"{path}/{i}.png")
         else:
             gripper_check_loss = None
 
