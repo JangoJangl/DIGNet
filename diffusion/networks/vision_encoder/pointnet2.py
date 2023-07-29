@@ -8,14 +8,14 @@ import numpy as np
 
 
 class Pointnet2(nn.Module):
-    def __init__(self, normal_channel=False, output_dim=1024):
+    def __init__(self, normal_channel=False, output_dim=1024, radius=0.1):
         super(Pointnet2, self).__init__()
         in_channel = 3 if normal_channel else 0
         self.output_dim = output_dim
         self.normal_channel = normal_channel
-        self.sa1 = PointNetSetAbstractionMsg(512, [0.1, 0.2, 0.4], [16, 32, 128], in_channel,[[32, 32, 64], [64, 64, 128], [64, 96, 128]])
-        self.sa2 = PointNetSetAbstractionMsg(128, [0.2, 0.4, 0.8], [32, 64, 128], 320,[[64, 64, 128], [128, 128, 256], [128, 128, 256]])
-        self.sa3 = PointNetSetAbstraction(None, None, None, 640 + 3, [256, 512, self.output_dim], True)
+        self.sa1 = PointNetSetAbstractionMsg(512, [radius, 2*radius, 4*radius], [16, 32, 128], in_channel,[[32, 32, 64], [64, 64, 128], [64, 96, 128]])
+        self.sa2 = PointNetSetAbstractionMsg(128, [2*radius, 4*radius, 8*radius], [32, 64, 128], 320,[[64, 64, 128], [128, 128, 256], [128, 128, 256]])
+        self.sa3 = PointNetSetAbstraction(None, None, None, 640 + 3, [self.output_dim // 4, self.output_dim // 2, self.output_dim], True)
 
     def forward(self, xyz):
         xyz = torch.transpose(xyz, 1, 2)  # (B, N, 3) -> (B, 3, N) for input to PointNet2

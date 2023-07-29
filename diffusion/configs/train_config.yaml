@@ -1,8 +1,8 @@
 defaults:
-  - agents: diffusion_grasp_agent_vnn #  k_diffusion_agent  # gpt_bc_agent # k_diffusion_agent  lfp_agent
+  - agents: diffusion_grasp_agent #  k_diffusion_agent  # gpt_bc_agent # k_diffusion_agent  lfp_agent
   - workspaces: diffusion_grasp_graspnet_manager
 
-log_dir: logs/grasping_end_to_end_learning/
+log_dir: logs/grasping_end_to_end_learning_final/
 plot_dir: plots/grasping_end_to_end_learning/
 plot_name: ${now:%Y-%m-%d}.png
 root_path: /home/temp_store/jandl/Dataset/acronym
@@ -25,15 +25,15 @@ representation: 'se3_pseudo_log_map_representation' # 'se3_log_map_representatio
 grasp_dim: 6
 pc_dim: 4096 # pointnet currently works just for 1024 points
 use_normals: false
-embedding_dim: 1023 # just global embedding has to be a multiple of 3
+embedding_dim: 1024 # just global embedding has to be a multiple of 3
 t_dim: 16
 render: false
 
 # diffusion model params
-hidden_dim: 512 # for MLP
+hidden_dim: 1024 # for MLP
 use_spectral_norm: false
-num_hidden_layers: 10
-max_train_steps: 100000
+num_hidden_layers: 4
+max_train_steps: 28000
 epoch: 50
 eval_every_n_steps: 4000
 residual_style: True
@@ -50,7 +50,7 @@ update_ema_every_n_steps: 1
 
 # diffusion hyper params
 activation: "Mish"
-n_timesteps: 8
+n_timesteps: 100
 beta_schedule: 'cosine'
 diffusion_x: false
 diffusion_x_M: 5
@@ -61,6 +61,7 @@ use_ema: false
 model_target: networks.diffusion.diffusion_models.DiffusionMLPNetwork
 predict_epsilon: true
 scaler: 'no_scale'
+batch_size: 50
 
 # evaluation params
 

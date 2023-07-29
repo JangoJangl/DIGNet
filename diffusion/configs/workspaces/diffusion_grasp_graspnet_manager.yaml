@@ -6,7 +6,7 @@ dataset_fn:
   root_directory: ${root_path}
   data_directory: ${data_path}
   h5_directory: ${h5_path}
-  subbatch_size: 100 #num grasps per object for each sample. when 1 ist fast enough use 1.
+  subbatch_size: ${batch_size} #num grasps per object for each sample. when 1 ist fast enough use 1.
   train_fraction: 0.98
 #  random_seed: ${seed}
   device: ${device}

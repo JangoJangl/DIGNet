@@ -8,6 +8,7 @@ embedder:
   _target_: networks.vision_encoder.pointnet2.Pointnet2
   normal_channel: ${use_normals}
   output_dim: ${embedding_dim}
+  radius: ${pointnet_radius}
 
 optimization:
   _target_: torch.optim.Adam

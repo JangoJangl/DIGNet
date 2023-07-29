@@ -1,0 +1,10 @@
+_target_: se3_transformer-pytorch.SE3Transformer
+_recursive_: false
+
+dim: 3
+heads: ${num_heads}
+depth: ${num_layers}
+dim_heads: ${dim_heads}
+num_degrees: ${num_degrees}
+valid_radius: ${valid_radius}
+causal: ${causal}

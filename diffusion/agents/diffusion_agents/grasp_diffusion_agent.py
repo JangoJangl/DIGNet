@@ -91,10 +91,11 @@ class GraspDiffusionAgent(BaseAgent):
             # run a test batch every n steps
             if not self.steps % self.eval_every_n_steps:
                 diversity_loss, accuracy_loss, coverage, gripper_check_loss = self. evaluate_agent(test_loader)
+                chamfer_loss = diversity_loss + accuracy_loss
                 log.info("Step {}: Mean diversity loss is {}".format(step, diversity_loss))
                 log.info("Step {}: Mean accuracy loss is {}".format(step, accuracy_loss))
-                if (diversity_loss+accuracy_loss) < best_test_loss:
-                    best_test_loss = diversity_loss+accuracy_loss
+                if chamfer_loss < best_test_loss:
+                    best_test_loss = chamfer_loss
                     self.store_model_weights(self.working_dir)
                     log.info('New best test loss. Stored weights have been updated!')
 
@@ -113,7 +114,7 @@ class GraspDiffusionAgent(BaseAgent):
                     "train_loss": batch_loss,
                     "diversity_loss": diversity_loss,
                     "accuracy_loss": accuracy_loss,
-                    "chamfer_loss": best_test_loss,
+                    "chamfer_loss": chamfer_loss,
                     "coverage": coverage,
                     "gripper_check_loss": gripper_check_loss,
                 }
@@ -217,10 +218,10 @@ class GraspDiffusionAgent(BaseAgent):
         grasp = inv_fct(grasp)
         #filtering grasp proposals
         if gripper_check: # or obj.metadata['file_name'] in self.visualize_paths:
-            if len(model_pred) < 40:
+            if len(model_pred) < 50:
                 mps = model_pred
             else:
-                mps = model_pred[:40]
+                mps = model_pred[:50]
             idx_collsion = collision_detection_pc_mesh(mps, torch.squeeze(points, dim=0).cpu().numpy()[:, :3])
             idx_not_in_gripper = not_in_gripper_detection_pc_mesh(mps, torch.squeeze(points, dim=0).cpu().numpy()[:, :3])
             idx = torch.cat([torch.tensor(idx_collsion), torch.tensor(idx_not_in_gripper)]).unique()
@@ -236,7 +237,7 @@ class GraspDiffusionAgent(BaseAgent):
         accuracy_loss = self.validation_loss(model_pred, grasp, 'x_to_y')
         coverage = torch.sum(torch.tensor(dist) < 0.03) / len(dist)
         # t_coverage = torch.sum(t_dist < 0.05) / len(t_dist) #Todo: adjust chamfer dist to this
-        return diversity_loss, accuracy_loss, coverage, np.array(gripper_check_loss) #, t_coverage  # return batch mean control point distance
+        return diversity_loss, accuracy_loss, coverage, gripper_check_loss #, t_coverage  # return batch mean control point distance
 
     @torch.no_grad()
     def predict(self, points: torch.Tensor, inv_fct) -> torch.Tensor:
