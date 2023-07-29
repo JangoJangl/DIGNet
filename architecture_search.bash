@@ -26,7 +26,7 @@ for  radius in "${radii[@]}"; do
     for scale in "${scales[@]}"; do
       for steps in "${diffusion_steps[@]}"; do
         for pc_dim in "${pc_dims[@]}"; do
-          declare job_name="job_${representations[$i]}_${grasp_dims[$i]}_${scale}_${radius}_${steps}_${batch_size}.sh"
+          declare job_name="job_${representations[$i]}_${grasp_dims[$i]}_${scale}_${radius}_${steps}_${pc_dim}.sh"
           cp job_template.sh $FOLDER_NAME/$job_name
           sed -i "3i#SBATCH -J ${job_name}" $FOLDER_NAME/$job_name
           echo "python diffusion/training.py \
