@@ -322,7 +322,7 @@ class GraspDiffusionAgent(BaseAgent):
 
             global_embedding, local_embedding = self.embedder(torch.unsqueeze(points, dim=0))
             # stack subbatches to a batch
-            global_embedding = torch.repeat_interleave(global_embedding, num_trajectories, dim=0)
+            global_embedding = torch.repeat_interleave(global_embedding, num_samples, dim=0)
 
             # flatten data
             global_embedding = torch.flatten(global_embedding, start_dim=1)  # dim0 is batch size

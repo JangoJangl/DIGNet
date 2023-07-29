@@ -15,7 +15,8 @@ declare -a noise_pred=(true)
 declare -a scales=('var_scale' 'no_scale')
 declare -a radii=(0.01 0.05 0.1)
 declare -a diffusion_steps=(10 100)
-declare -a batch_sizes=(5 100)
+declare -a batch_sizes=(100)
+declare -a pc_dims=(1024 4096)
 declare -a embedding_dimensions=(1024)
 
 arraylength=${#representations[@]}
@@ -24,7 +25,7 @@ for  radius in "${radii[@]}"; do
   for (( i=0; i<${arraylength}; i++ )); do
     for scale in "${scales[@]}"; do
       for steps in "${diffusion_steps[@]}"; do
-        for batch_size in "${batch_sizes[@]}"; do
+        for pc_dim in "${pc_dims[@]}"; do
           declare job_name="job_${representations[$i]}_${grasp_dims[$i]}_${scale}_${radius}_${steps}_${batch_size}.sh"
           cp job_template.sh $FOLDER_NAME/$job_name
           sed -i "3i#SBATCH -J ${job_name}" $FOLDER_NAME/$job_name
@@ -34,7 +35,7 @@ for  radius in "${radii[@]}"; do
                 grasp_dim=${grasp_dims[$i]} \
                 scaler='${scale}' \
                 n_steps = ${steps} \
-                batch_size=${batch_size} \
+                pc_dim=${pc_dim} \
                 pointnet_radius=${radius} \
                 root_path=\$TMP/acronym \
                 data_path=\$TMP/acronym/mesh_contacts_graspnet \
