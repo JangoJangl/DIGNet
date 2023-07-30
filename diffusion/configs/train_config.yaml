@@ -23,14 +23,14 @@ window_size: 1
 #grasp_dims: rot_6d -> 9, se3, -> 16, log_map -> 6, trans_quat -> 7
 representation: 'se3_pseudo_log_map_representation' # 'se3_log_map_representation' # 'trans_quat_representation' ,rotation_6d_representation
 grasp_dim: 6
-pc_dim: 4096 # pointnet currently works just for 1024 points
+pc_dim: 1024 # pointnet currently works just for 1024 points
 use_normals: false
-embedding_dim: 1024 # just global embedding has to be a multiple of 3
+embedding_dim: 256 # just global embedding has to be a multiple of 3
 t_dim: 16
 render: false
 
 # diffusion model params
-hidden_dim: 1024 # for MLP
+hidden_dim: 256 # for MLP
 use_spectral_norm: false
 num_hidden_layers: 4
 max_train_steps: 28000
@@ -40,7 +40,7 @@ residual_style: True
 latent_dim: 32
 
 # embedder parameter
-pointnet_radius: 0.1
+pointnet_radius: 0.05
 
 # noise conditional score based models parameters
 sigma_max: 33
@@ -50,7 +50,7 @@ update_ema_every_n_steps: 1
 
 # diffusion hyper params
 activation: "Mish"
-n_timesteps: 100
+n_timesteps: 20
 beta_schedule: 'cosine'
 diffusion_x: false
 diffusion_x_M: 5
@@ -60,8 +60,9 @@ use_ema: false
 
 model_target: networks.diffusion.diffusion_models.DiffusionMLPNetwork
 predict_epsilon: true
-scaler: 'no_scale'
-batch_size: 50
+scaler: 'var_scale'
+batch_size: 200
+num_objects: 1
 
 # evaluation params
 

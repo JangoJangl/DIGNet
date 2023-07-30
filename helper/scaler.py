@@ -34,12 +34,18 @@ class Scaler(object):
         self.grasp_var[-1] = torch.tensor(1.0)
         self.grasp_var[8] = torch.tensor(1.0)
 
-    def min_max_scale(self, obj, grasps, representation='trans_quat_representation'):
+    def max_scale(self, obj, grasps, representation='trans_quat_representation'):
         """ Scales the object and the grasps by min and max values
         :param obj: Torch.tensor
         :param grasps: Torch.tensor
         """
-        pass
+        grasps = grasps / self.grasp_max[self.representations[representation]]
+        obj = obj / self.grasp_max[self.representations["trans"]]
+
+        def inverse(g):
+            return g * self.grasp_max[self.representations[representation]]
+
+        return obj, grasps, inverse
 
     def mean_var_scale(self, obj, grasps, representation='trans_quat_representation'):
         """ Scales the object and the grasps by mean and variance
