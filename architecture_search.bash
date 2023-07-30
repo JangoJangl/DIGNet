@@ -34,7 +34,7 @@ for  radius in "${radii[@]}"; do
                 representation='${representations[$i]}' \
                 grasp_dim=${grasp_dims[$i]} \
                 scaler='${scale}' \
-                n_steps = ${steps} \
+                n_timesteps = ${steps} \
                 pc_dim=${pc_dim} \
                 pointnet_radius=${radius} \
                 root_path=\$TMP/acronym \
