@@ -17,7 +17,6 @@ class BaseAgent(abc.ABC):
     def __init__(
         self,
             model: DictConfig,
-            embedder: DictConfig,
             optimization: DictConfig,
             device: str,
             max_train_steps: int,
@@ -26,9 +25,8 @@ class BaseAgent(abc.ABC):
     ):
         self.scaler = None
         self.model = hydra.utils.instantiate(model).to(device)
-        self.embedder = hydra.utils.instantiate(embedder).to(device)
         self.optimizer = hydra.utils.instantiate(
-            optimization, params=list(self.embedder.parameters()) + list(self.model.get_params())
+            optimization, params=self.model.get_params()
         )
 
         self.epoch = epoch
@@ -38,7 +36,7 @@ class BaseAgent(abc.ABC):
         self.max_train_steps = int(max_train_steps)
         self.eval_every_n_steps = eval_every_n_steps
         self.working_dir = os.getcwd()
-        total_params = sum(p.numel() for p in list(self.embedder.parameters()) + list(self.model.get_params()))
+        total_params = sum(p.numel() for p in self.model.get_params())
         log.info("The model has a total amount of {} parameters".format(total_params))
 
     @abc.abstractmethod

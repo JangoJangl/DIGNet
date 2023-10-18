@@ -1,0 +1,4 @@
+_target_: networks.vision_encoder.pointnet2.Pointnet2
+
+output_dim: ${embedding_dim}
+radius: ${pointnet_radius}

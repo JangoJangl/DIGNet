@@ -1,14 +1,16 @@
-_target_: agents.diffusion_agents.grasp_diffusion_agent.PreEmbeddingGraspDiffusionAgent # agents.joint_ibc_agent.PlanarRobotJointIBCAgent  # agents.joint_distribution_ebm_agent.PlanarBotJointEBMAgent
+_target_: agents.diffusion_agents.grasp_diffusion_agent.GraspDiffusionAgent # agents.joint_ibc_agent.PlanarRobotJointIBCAgent  # agents.joint_distribution_ebm_agent.PlanarBotJointEBMAgent
 _recursive_: false
 
 defaults:
-  - model: diffusion_model # diffusion_model
+  - model: embedder_free_diffusion_model # diffusion_model
+
+
 
 optimization:
   _target_: torch.optim.Adam
   lr: 5e-4 # for transformer
 #  lr: 5e-4 # for MLP
-  weight_decay: 0
+  weight_decay: 0.00001
 
 eval_every_n_steps: ${eval_every_n_steps}
 max_train_steps: ${max_train_steps}
@@ -18,5 +20,7 @@ decay: ${decay}
 device: ${device}
 update_ema_every_n_steps: ${update_ema_every_n_steps}
 window_size: ${window_size}
+evaluation: ${evaluation}
+visualize_paths: ${visualize_paths}
 #diffusion_kde: ${diffusion_kde}
 #diffusion_kde_samples: ${diffusion_kde_samples}

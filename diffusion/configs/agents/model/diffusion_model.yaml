@@ -1,7 +1,11 @@
-_target_: networks.diffusion.diffusion.Diffusion
+_target_: networks.diffusion.point_diffusion.Diffusion
 _recursive_: false
 
-condition_dim: ${embedding_dim}
+defaults:
+  - embedder: vnn_pointnet2 # pointnet2, hierarchical_pointnet2, se3transformer
+
+
+
 input_dim: ${grasp_dim}
 beta_schedule: ${beta_schedule}
 n_timesteps: ${n_timesteps}

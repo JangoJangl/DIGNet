@@ -31,7 +31,6 @@ class GraspDiffusionAgent(BaseAgent):
     #TODO: Use local Embedding as well
     def __init__(
             self,
-            embedder: DictConfig,
             model: DictConfig,
             optimization: DictConfig,
             device: str,
@@ -45,7 +44,7 @@ class GraspDiffusionAgent(BaseAgent):
             evaluation: bool = True,
             visualize_paths: list = [],
     ):
-        super().__init__(model, embedder, optimization, device, max_train_steps, eval_every_n_steps)
+        super().__init__(model, optimization, device, max_train_steps, eval_every_n_steps)
         self.validation_loss = losses.trafo_chamfer_distance # TODO: instantiate loss function by hydra
         self.ema_helper = ExponentialMovingAverage(self.model.get_params(), decay, self.device)
         self.use_ema = use_ema
@@ -63,6 +62,7 @@ class GraspDiffusionAgent(BaseAgent):
         Define the scaler from the Workspace class used to scale embedding and output data if necessary
         """
         self.processor = processor
+        self.model.inv_fct = processor.postprocess
 
     def set_bounds(self, size_bounds=7):
         """
@@ -118,23 +118,21 @@ class GraspDiffusionAgent(BaseAgent):
                     "coverage": coverage,
                     "gripper_check_loss": gripper_check_loss,
                 }
-        )
-        self.store_model_weights(self.working_dir)
+            )
+        # self.store_model_weights(self.working_dir)
 
     def train_step(self, points: torch.Tensor, grasp: torch.Tensor) -> float:
 
         # Set the model to train mode.
         self.model.train()
-        self.embedder.train()
         # Compute the embedding.
-        global_embedding = self.embedder(points)
         # stack subbatches to a batch
-        embedding = torch.repeat_interleave(global_embedding, grasp.size(dim=1), dim=0)
+        # embedding = torch.repeat_interleave(global_embedding, grasp.size(dim=1), dim=0)
         grasp = torch.flatten(grasp, start_dim=0, end_dim=1)
 
         # flatten data
         grasp = torch.flatten(grasp, start_dim=1)  # dim0 is batch size
-        embedding = torch.flatten(embedding, start_dim=1)  # dim0 is batch size
+        # embedding = torch.flatten(embedding, start_dim=1)  # dim0 is batch size
 
 
         # embedding = self.scaler.scale_input(embedding)
@@ -142,9 +140,9 @@ class GraspDiffusionAgent(BaseAgent):
 
         # Compute the loss.
         if self.processor.representation == 'rot_6d_representation':
-            loss = self.model.loss(grasp, embedding, gram_schmidt=True)
+            loss = self.model.loss(grasp, points, gram_schmidt=True)
         else:
-            loss = self.model.loss(grasp, embedding)
+            loss = self.model.loss(grasp, points)
         # Before the backward pass, zero all the network gradients
         self.optimizer.zero_grad()
         # Backward pass: compute gradient of the loss with respect to parameters
@@ -164,6 +162,8 @@ class GraspDiffusionAgent(BaseAgent):
         test_gripper_check_loss = []
         test_coverage = []
         for i, tensors in enumerate(test_loader):
+            if i == 0:
+                continue
             gripper_check = True if i < 6 else False
             points, grasp = tensors
             # (points, grasp), success = test_loader.dataset.get_screwdriver()
@@ -183,6 +183,45 @@ class GraspDiffusionAgent(BaseAgent):
         avrg_test_gripper_check_loss = np.mean(test_gripper_check_loss)
         return avrg_test_div_loss, avrg_test_acc_loss, avrg_test_coverage, avrg_test_gripper_check_loss
 
+    def evaluate_agent_sizes(self, test_loader):
+        areas = torch.tensor(test_loader.dataset.areas)
+        areas_s, area_idcs = torch.sort(areas)
+        maxs = torch.tensor(test_loader.dataset.maxs)
+        maxs_s, max_idcs = torch.sort(maxs)
+        variances = torch.tensor(test_loader.dataset.variances)
+        variances_s, var_idcs = torch.sort(variances)
+        smallest = 0.025
+        small = 0.05
+        medium = 0.1
+        large = 0.2
+        largest = 1
+        smallest_idx = (areas < smallest).nonzero()
+        small_idx = ((areas >= smallest) & (areas < small)).nonzero()
+        medium_idx = ((areas >= small) & (areas < medium)).nonzero()
+        large_idx = ((areas >= medium) & (areas < large)).nonzero()
+        largest_idx = (areas >= large).nonzero()
+        for i, size in zip(var_idcs, variances_s):
+            points, grasp = test_loader.dataset[i]
+            # (points, grasp), success = test_loader.dataset.get_screwdriver()
+            obj = test_loader.dataset.processor.current_obj
+
+            inv_fct = self.processor.postprocess
+            div_loss, acc_loss, coverage, gripper_check_loss = self.evaluate(torch.unsqueeze(points, dim=0), torch.unsqueeze(grasp, dim=0), inv_fct,
+                                                                             test_loader.dataset.processor.current_obj,
+                                                                             i, gripper_check=True)
+            wandb.log(
+                {
+                    "object_area": areas[i],
+                    "object_max": maxs[i],
+                    "object_variance": variances[i],
+                    "diversity_loss": div_loss,
+                    "accuracy_loss": acc_loss,
+                    "chamfer_loss": div_loss + acc_loss,
+                    "coverage": coverage,
+                    "gripper_check_loss": gripper_check_loss,
+                }
+            )
+
     @torch.no_grad()
     def evaluate(self, points: torch.Tensor, grasp: torch.Tensor, inv_fct, obj, i, gripper_check=False, path=None) -> float:
 
@@ -192,36 +231,33 @@ class GraspDiffusionAgent(BaseAgent):
 
 
         # Set the model to eval mode.
-        self.embedder.eval()
         self.model.eval()
-
-        global_embedding = self.embedder(points)
-        # stack subbatches to a batch
-        global_embedding = torch.repeat_interleave(global_embedding, grasp.size(dim=1), dim=0)
+        # # stack subbatches to a batch
+        # global_embedding = torch.repeat_interleave(global_embedding, grasp.size(dim=1), dim=0)
         grasp = torch.flatten(grasp, start_dim=0, end_dim=1)
 
         # flatten data
         grasp = torch.flatten(grasp, start_dim=1)  # dim0 is batch size
-        global_embedding = torch.flatten(global_embedding, start_dim=1)  # dim0 is batch size
+        # global_embedding = torch.flatten(global_embedding, start_dim=1)  # dim0 is batch size
 
 
         # post = self.processor.postprocess(grasp)
         # Visualizer.render_images(obj, post[:100])
 
         if self.processor.representation_name == 'rotation_6d_representation':
-            model_pred = self.model(global_embedding, gram_schmidt=True)
+            model_pred = self.model(points, gram_schmidt=True)
         else:
-            model_pred = self.model(global_embedding)
+            model_pred = self.model(points)
 
         # apply inverse function
         model_pred = inv_fct(model_pred)
         grasp = inv_fct(grasp)
         #filtering grasp proposals
         if gripper_check: # or obj.metadata['file_name'] in self.visualize_paths:
-            if len(model_pred) < 50:
+            if len(model_pred) < 100:
                 mps = model_pred
             else:
-                mps = model_pred[:50]
+                mps = model_pred[torch.randint(len(model_pred), (100,))]
             idx_collsion = collision_detection_pc_mesh(mps, torch.squeeze(points, dim=0).cpu().numpy()[:, :3])
             idx_not_in_gripper = not_in_gripper_detection_pc_mesh(mps, torch.squeeze(points, dim=0).cpu().numpy()[:, :3])
             idx = torch.cat([torch.tensor(idx_collsion), torch.tensor(idx_not_in_gripper)]).unique()
@@ -237,6 +273,7 @@ class GraspDiffusionAgent(BaseAgent):
         accuracy_loss = self.validation_loss(model_pred, grasp, 'x_to_y')
         coverage = torch.sum(torch.tensor(dist) < 0.03) / len(dist)
         # t_coverage = torch.sum(t_dist < 0.05) / len(t_dist) #Todo: adjust chamfer dist to this
+        print("object done")
         return diversity_loss, accuracy_loss, coverage, gripper_check_loss #, t_coverage  # return batch mean control point distance
 
     @torch.no_grad()
@@ -279,7 +316,7 @@ class GraspDiffusionAgent(BaseAgent):
 
         return model_pred  # .cpu().numpy()
 
-    def visualize_trajectory_forward(self, loader, num_obj=1, num_samples=10):
+    def visualize_trajectory_forward(self, loader, num_obj=1, num_samples=1):
         for i, tensors in enumerate(loader):
             if i >= num_obj:
                 break
@@ -289,6 +326,8 @@ class GraspDiffusionAgent(BaseAgent):
             self.embedder.eval()
             self.model.eval()
             grasp = torch.squeeze(grasp)
+            grasp = grasp[:num_samples]
+            list_gt = torch.clone(grasp)
             noise = torch.randn_like(grasp).to(self.device)
             for t_step in range(self.model.n_timesteps):
 
@@ -303,8 +342,9 @@ class GraspDiffusionAgent(BaseAgent):
                     b2 = a2 - (b1 * a2).sum(-1, keepdim=True) * b1
                     b2 = F.normalize(b2, dim=-1)
                     g_t = torch.cat((t, b1, b2), dim=-1)
+                list_gt = torch.cat((list_gt, g_t), dim=0)
 
-                Visualizer.visualize(loader.dataset.processor.current_obj, inv_fct(g_t))
+            Visualizer.visualize(loader.dataset.processor.current_obj, inv_fct(list_gt))
 
 
     def visualize_trajectory_backward(self, test_loader, num_obj=1, num_samples=10):
@@ -320,7 +360,7 @@ class GraspDiffusionAgent(BaseAgent):
             self.embedder.eval()
             self.model.eval()
 
-            global_embedding, local_embedding = self.embedder(torch.unsqueeze(points, dim=0))
+            global_embedding = self.embedder(points)
             # stack subbatches to a batch
             global_embedding = torch.repeat_interleave(global_embedding, num_samples, dim=0)
 
@@ -331,9 +371,7 @@ class GraspDiffusionAgent(BaseAgent):
             model_pred, trajectories = self.model.p_sample_loop(global_embedding, shape, return_diffusion=True)
             # apply inverse function
             colors = [[1 - i / trajectories.size(dim=1), i / trajectories.size(dim=1), 0] for i in range(trajectories.size(dim=1))]
-            for traj in trajectories:
-                traj = inv_fct(traj)
-                Visualizer.visualize(test_loader.dataset.processor.current_obj, traj, colors=colors)
+            scene = Visualizer.visualize(test_loader.dataset.processor.current_obj, inv_fct(trajectories.view(-1,7)))
 
     def visualize_diffused_distribution(self, loader, num_steps=5, num_obj=1, num_samples=100):
 
@@ -368,7 +406,6 @@ class GraspDiffusionAgent(BaseAgent):
         """
         Method to load a pretrained model weights inside self.model
         """
-        self.embedder.load_state_dict(torch.load(os.path.join(weights_path, "embedder_state_dict.pth")))
         self.model.load_state_dict(torch.load(os.path.join(weights_path, "model_state_dict.pth")))
         log.info('Loaded pre-trained model parameters')
 
@@ -376,6 +413,5 @@ class GraspDiffusionAgent(BaseAgent):
         """
         Store the model weights inside the store path as model_weights.pth
         """
-        torch.save(self.embedder.state_dict(), os.path.join(store_path, "embedder_state_dict.pth"))
         torch.save(self.model.state_dict(), os.path.join(store_path, "model_state_dict.pth"))
         log.info('Stored model parameters')

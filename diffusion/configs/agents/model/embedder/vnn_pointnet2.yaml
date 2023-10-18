@@ -1,4 +1,4 @@
-_target_: networks.vision_encoder.vnn_pointnet.VNNPointnet2
+_target_: networks.vision_encoder.vnn_pointnet2.VNNPointnet2
 _recursive_: false
 
 pointnet_radius: {pointnet_radius}

@@ -45,7 +45,7 @@ class Diffusion(nn.Module):
             self.betas = cosine_beta_schedule(n_timesteps).to(self.device)
         elif beta_schedule == 'vp':
             self.betas = vp_beta_schedule(n_timesteps).to(self.device)
-
+        self.betas = vp_beta_schedule(n_timesteps).to(self.device)
         self.model = hydra.utils.instantiate(model)
         self.n_timesteps = n_timesteps
         self.clip_denoised = clip_denoised
@@ -231,7 +231,7 @@ class Diffusion(nn.Module):
         b, *_ = x.shape
         with torch.no_grad():
             model_mean, _, model_log_variance = self.p_mean_variance(x=x, t=t, s=s)
-        noise = torch.randn_like(x)
+        noise = torch.zeros_like(x) #torch.randn_like(x)
         # no noise when t == 0
         nonzero_mask = (1 - (t == 0).float()).reshape(b, *((1,) * (len(x.shape) - 1)))
 

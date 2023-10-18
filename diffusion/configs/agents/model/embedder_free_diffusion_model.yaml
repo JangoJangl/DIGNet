@@ -1,0 +1,22 @@
+_target_: networks.diffusion.embedder_free_diffusion.Diffusion
+_recursive_: false
+
+
+input_dim: ${grasp_dim}
+beta_schedule: ${beta_schedule}
+n_timesteps: ${n_timesteps}
+loss_type: 'l2'
+clip_denoised: true # set to true after defining diffusion space
+predict_epsilon: ${predict_epsilon}
+device: ${device}
+diffusion_x: ${diffusion_x}
+diffusion_x_M: ${diffusion_x_M}
+
+# Network architecture
+model:
+  _target_: ${model_target}
+  x_dim: ${grasp_dim}
+  diffusion_steps: ${n_timesteps}
+  radius: ${pointnet_radius}
+  t_dim: ${t_dim}
+  device: ${device}

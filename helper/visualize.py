@@ -1,3 +1,5 @@
+import os
+import shutil
 import open3d as o3d
 import trimesh
 import torch
@@ -57,6 +59,8 @@ class Visualizer(object):
             scene.append(gripper)
 
         o3d.visualization.draw_geometries(scene)
+
+        return scene
 
 
     @staticmethod
@@ -275,6 +279,35 @@ class Visualizer(object):
 
         o3d.visualization.draw_geometries(scene)
 
+    @staticmethod
+    def export_scene(scene, folder_path, option="gradient"):
+
+        if os.path.exists(folder_path):
+            shutil.rmtree(folder_path)
+
+        os.makedirs(folder_path)
+        os.makedirs(os.path.join(folder_path, "meshes"))
+        os.makedirs(os.path.join(folder_path, "meshes/good_grasps"))
+        os.makedirs(os.path.join(folder_path, "meshes/bad_grasps"))
+        os.makedirs(os.path.join(folder_path, "meshes/gradient_grasps"))
+        os.makedirs(os.path.join(folder_path, "points"))
+
+        for i, obj in enumerate(scene):
+            if i == 0:
+                continue
+            if type(obj).__name__ == "TriangleMesh" and option == "good":
+                path = os.path.join(folder_path, "meshes/good_grasps", str(i) + ".obj")
+                o3d.io.write_triangle_mesh(path, obj)
+            elif type(obj).__name__ == "TriangleMesh" and option == "bad":
+                path = os.path.join(folder_path, "meshes/bad_grasps", str(i) + ".obj")
+                o3d.io.write_triangle_mesh(path, obj)
+            if type(obj).__name__ == "TriangleMesh" and option == "gradient":
+                path = os.path.join(folder_path, "meshes/gradient_grasps", str(i) + ".obj")
+                o3d.io.write_triangle_mesh(path, obj)
+            elif type(obj).__name__ == "PointCloud":
+                path = os.path.join(folder_path, "points", str(i) + ".ply")
+                o3d.io.write_point_cloud(path, obj)
+
 
 
 
@@ -326,7 +359,7 @@ def create_gripper_mesh(color=[0, 0, 1], width=0.1, simplified=False):
     return gripper_mesh
 
 
-def create_finger_mesh(color=[0, 0, 1], width=0.1):
+def create_finger_mesh(color=[0.5, 0.5, 0.5], width=0.1):
     """
 
     :param color: color of gripper

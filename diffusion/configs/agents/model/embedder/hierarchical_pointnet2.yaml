@@ -1,0 +1,5 @@
+_target_: networks.vision_encoder.pointnet2.Pointnet2
+
+output_dim: ${embedding_dim}
+diffusion_steps: ${n_timesteps}
+radius: ${pointnet_radius}

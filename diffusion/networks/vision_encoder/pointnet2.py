@@ -30,7 +30,10 @@ class Pointnet2(nn.Module):
         l3_xyz, l3_points = self.sa3(l2_xyz, l2_points)
         x = l3_points.view(B, self.output_dim)
 
-        return x  #, torch.transpose(l3_xyz, 1, 2) # (B, 1024), (B, N, 3) to be consistent with outer format
+        return x, B  #, torch.transpose(l3_xyz, 1, 2) # (B, 1024), (B, N, 3) to be consistent with outer format
+
+    def compute_features(self, condition, t, position):
+        return condition
 
 
 class get_loss(nn.Module):

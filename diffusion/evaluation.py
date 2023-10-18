@@ -18,11 +18,11 @@ OmegaConf.register_new_resolver(
 torch.cuda.empty_cache()
 
 
-@hydra.main(config_path="/home/i53/student/jandl/repos/DIGNet/logs/cluster/grasping_end_to_end_learning/runs/2023-07-22/00-10-25_architecture_optimization/.hydra", config_name="config")
+@hydra.main(config_path="/home/i53/student/jandl/repos/DIGNet/logs/cluster_1/grasping_end_to_end_learning_final/runs/2023-07-31/20-14-09_architecture_optimization/.hydra", config_name="config")
 def main(cfg: DictConfig) -> None:
 
     with open_dict(cfg):
-        cfg.pretrained_model_path = "/home/i53/student/jandl/repos/DIGNet/logs/cluster/grasping_end_to_end_learning/runs/2023-07-22/00-10-25_architecture_optimization"
+        cfg.pretrained_model_path = "/home/i53/student/jandl/repos/DIGNet/logs/cluster_1/grasping_end_to_end_learning_final/runs/2023-07-31/20-14-09_architecture_optimization"
 
     # if cfg.pretrained_model_path is not None:
     #     root_path = cfg.root_path
@@ -51,40 +51,45 @@ def main(cfg: DictConfig) -> None:
     agent.set_processor(workspace_manager.get_processor())
     agent.set_bounds(cfg.grasp_dim)
 
-    wandb.config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-
+    # wandb.config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+    #
     # run = wandb.init(
-    #     project=cfg.wandb.project,
+    #     project="evaluation",
     #     entity=cfg.wandb.entity,
-    #     group=cfg.group,
+    #     group="size_evaluation_variance",
     #     # mode="disabled",
     #     config=wandb.config
     # )
-    # agent.visualize_trajectory(
-    #     workspace_manager.data_loaders['test'],
-    #     num_trajectories=3
-    # )
+    # agent.evaluate_agent_sizes(workspace_manager.data_loaders['test'])
+    # wandb.finish()
+
+    # agent.evaluate_agent(workspace_manager.data_loaders['test'])
+    agent.visualize_trajectory_backward(
+        workspace_manager.data_loaders['test'],
+        num_obj=1,
+        num_samples=1,
+    )
     # eval the agent
     # agent.visualize_diffused_distribution(workspace_manager.data_loaders['test'], num_steps=5, num_obj=1, num_samples=100)
     # agent.visualize_forward_trajectory(workspace_manager.data_loaders['test'], num_obj=1, num_samples=10)
     # agent.visualize_backward_trajectory(workspace_manager.data_loaders['test'], num_obj=1, num_samples=10)
-    diversity_loss, accuracy_loss, coverage, gripper_check_loss = agent.evaluate_agent(workspace_manager.data_loaders['train'], path=cfg.pretrained_model_path)
-    print(f"precision-CD: {accuracy_loss}")
-    print(f"coverage-CD: {diversity_loss}")
-    print(f"coverage: {coverage}")
-    print(f"gripper check accuracy:  {gripper_check_loss}")
-    log.info("done")
+    # diversity_loss, accuracy_loss, coverage, gripper_check_loss = agent.evaluate_agent(workspace_manager.data_loaders['train'], path=cfg.pretrained_model_path)
+    # print(f"precision-CD: {accuracy_loss}")
+    # print(f"coverage-CD: {diversity_loss}")
+    # print(f"coverage: {coverage}")
+    # print(f"gripper check accuracy:  {gripper_check_loss}")
+    # log.info("done")
 
 
 
-    row = [cfg.representation, cfg.pointnet_radius, cfg.scaler, cfg.predict_epsilon, accuracy_loss, diversity_loss, coverage, gripper_check_loss]
-
-    with open('/home/i53/student/jandl/repos/DIGNet/diffusion/eval_table.csv', 'a') as f_object:
-
-        np.savetxt(f_object, [row], fmt="%s", delimiter=' & ', newline='\\\\\n')
-
-        # Close the file object
-        f_object.close()
+    # row = [cfg.representation, cfg.pointnet_radius, cfg.scaler, cfg.predict_epsilon, accuracy_loss, diversity_loss, coverage, gripper_check_loss]
+    #
+    # with open('/home/i53/student/jandl/repos/DIGNet/diffusion/eval_table.csv', 'a') as f_object:
+    #
+    #     np.savetxt(f_object, [row], fmt="%s", delimiter=' & ', newline='\\\\\n')
+    #
+    #     # Close the file object
+    #     f_object.close()
 
 if __name__ == "__main__":
     main()

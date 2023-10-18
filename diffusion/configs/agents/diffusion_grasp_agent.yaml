@@ -2,19 +2,15 @@ _target_: agents.diffusion_agents.grasp_diffusion_agent.GraspDiffusionAgent # ag
 _recursive_: false
 
 defaults:
-  - model: diffusion_model # diffusion_model
+  - model: diffusion_model
 
-embedder:
-  _target_: networks.vision_encoder.pointnet2.Pointnet2
-  normal_channel: ${use_normals}
-  output_dim: ${embedding_dim}
-  radius: ${pointnet_radius}
+
 
 optimization:
   _target_: torch.optim.Adam
   lr: 5e-4 # for transformer
 #  lr: 5e-4 # for MLP
-  weight_decay: 0
+  weight_decay: 0.00001
 
 eval_every_n_steps: ${eval_every_n_steps}
 max_train_steps: ${max_train_steps}

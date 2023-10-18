@@ -15,7 +15,7 @@ def meanpool(x, dim=-1, keepdim=False):
 
 class VNNPointnet2(nn.Module):
     ''' PointNet-2 Net '''
-    def __init__(self, pointnet_radius=0.1, hidden_dim=512, in_features=3,
+    def __init__(self, diffusion_steps=5, pointnet_radius=0.1, hidden_dim=512, in_features=3,
                  out_features = 512, device='cpu'):
         super().__init__()
         if out_features%3 !=0:
@@ -24,9 +24,12 @@ class VNNPointnet2(nn.Module):
         self.vnn_resnet = VNN_ResnetPointnet(c_dim=int(out_features/3), device=device)
 
     def forward(self, pc):
-
+        B = pc.size(0)
         xyz_feats = self.vnn_resnet(pc)
-        return xyz_feats.reshape(pc.shape[0], -1)
+        return xyz_feats.reshape(B, -1), B
+
+    def compute_features(self, condition, t, position):
+        return condition
 
 
 class VNN_ResnetPointnet(nn.Module):
@@ -67,7 +70,7 @@ class VNN_ResnetPointnet(nn.Module):
         self.device = device
 
     def forward(self, p):
-        batch_size = p.size(0)
+        B = p.size(0)
         p = p.unsqueeze(1).transpose(2, 3)
         # mean = get_graph_mean(p, k=self.k)
         # mean = p_trans.mean(dim=-1, keepdim=True).expand(p_trans.size())
@@ -112,6 +115,9 @@ class VNN_ResnetPointnet(nn.Module):
             return c, c_std
 
         return c
+
+    def compute_features(self, condition, t, position):
+        return condition
 
 
 
