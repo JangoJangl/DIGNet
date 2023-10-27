@@ -1,6 +1,16 @@
 # DIGNet
 
 
+### Installation
+
+    First install clone repo https://github.com/ALRhub/SimulationFramework and https://github.com/NVlabs/acronym
+    Then use the following command to create a conda environment:
+
+    ```
+    sh diffusion/install.sh
+    ```
+
+For Troubleshooting caused by Theseus see https://github.com/AI-App/Theseus. Try installing it from source.
 
 
 ## Inference TODO
@@ -60,5 +70,3 @@ Follow the [Acronym Datset docs](https://github.com/NVlabs/acronym) and replace 
 * --object ../dataset/acronym/grasp
 
 In general notice, that all `data` is moved to `../dataset/acronym`
-
-Note: Just use a implemented model as orientation. You will do it! :)

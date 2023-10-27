@@ -77,14 +77,18 @@ pip install -e .
 
 pip install rtree
 
+mamba install -c conda-forge suitesparse -y -q
+
+pip install theseus-ai 
+
 
 # pip install opencv-python==4.6.0.66
 
 # Clone bet
-echo Clone Behavior Transformers
+#echo Clone Behavior Transformers
 # git clone https://github.com/notmahi/bet
 
-echo Clone Relay policy learning
+#echo Clone Relay policy learning/\
 # git clone https://github.com/google-research/relay-policy-learning
 
 echo Done installing all necessary packages. Please follow the next steps mentioned on the readme

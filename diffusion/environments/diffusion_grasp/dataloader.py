@@ -168,8 +168,8 @@ class GraspnetAcronymDataset(Dataset):
         variances = []
         for idx, file in enumerate(self.file_names):
             try:
-                if idx == 40:
-                    break
+                # if idx == 40:
+                #     break
                 o = load_mesh(os.path.join(self.h5_directory, file.replace('.npz', '.h5')), self.root_directory)
 
                 # print(f"area: {o.area}, volume: {o.mass_properties['volume']}, scale: {o.scale}")
