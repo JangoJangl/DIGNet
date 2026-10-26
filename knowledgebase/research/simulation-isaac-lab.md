@@ -3,11 +3,11 @@ title: Simulation with Isaac Lab
 type: research
 status: active
 created: 2026-10-25
-updated: 2026-10-25
+updated: 2026-10-26
 tags: [simulation, isaac-lab, isaac-gym, data-generation, rl]
-related: ["[[research/sim-to-real]]", "[[research/lerobot-so101]]", "[[research/roadmap-sim-to-real-so101]]", "[[state/ideas#I-08 Simulation based grasp success evaluation]]", "[[state/ideas#I-09 SO-101 gripper grasp dataset from simulation]]"]
+related: ["[[state/sim-grasp-validation]]", "[[research/sim-to-real]]", "[[research/lerobot-so101]]", "[[research/roadmap-sim-to-real-so101]]", "[[state/ideas#I-08 Simulation based grasp success evaluation]]", "[[state/ideas#I-09 SO-101 gripper grasp dataset from simulation]]"]
 confidence: medium
-sources: ["https://github.com/isaac-sim/IsaacLab", "https://docs.isaacsim.omniverse.nvidia.com/6.2.0/installation/download.html", "https://docs.nvidia.com/learning/physical-ai/getting-started-with-isaac-lab/latest/train-a-robot-arm/02-so101-robot.html", "https://docs.nvidia.com/learning/physical-ai/sim-to-real-so-101/latest/index.html"]
+sources: ["https://github.com/isaac-sim/IsaacLab", "https://github.com/isaac-sim/IsaacLab/tree/v3.0.0/docs/source/isaaclab/installation.rst", "https://docs.isaacsim.omniverse.nvidia.com/6.2.0/installation/download.html", "https://docs.nvidia.com/learning/physical-ai/getting-started-with-isaac-lab/latest/train-a-robot-arm/02-so101-robot.html", "https://docs.nvidia.com/learning/physical-ai/sim-to-real-so-101/latest/index.html"]
 ---
 
 # Simulation with Isaac Lab
@@ -19,6 +19,19 @@ sources: ["https://github.com/isaac-sim/IsaacLab", "https://docs.isaacsim.omnive
 - Versions (checked 2026-10-25, confidence medium): Isaac Sim **6.2.0** is listed as the latest release (October 2026). NVIDIA's 2026 Isaac Lab tutorials link Isaac Lab **3.0** documentation and use the **Newton** physics engine (MuJoCo-Warp solver) for an SO-101 task. The NVIDIA SO-101 sim-to-real workshop pins Isaac Sim 5.1.0 + Isaac Lab 2.3.0 + LeRobot 0.4.3; the Seeed LeIsaac guide used Isaac Sim 4.5 + Isaac Lab 2.1. Pick one consistent pin per project and record it here.
 - Hardware: an RTX GPU is required (the NVIDIA workshop recommends Ada or Blackwell). Isaac Lab runs on Linux and Windows; Python 3.11 for recent versions, so DIGNet's Python 3.8 environment must be upgraded or kept separate ([[state/ideas#I-12 Modernise the environment]]).
 - Alternatives: **ManiSkill3** (SAPIEN, very fast GPU rendering, permissive licence), **MuJoCo / MJX / MuJoCo Playground**, **Genesis**. All can play the same three roles below; Isaac Lab is preferred here because of the existing SO-101 assets (Isaac Lab `SO101_CFG`, LeIsaac) and the NVIDIA SO-101 tutorials.
+
+## Isaac Lab 3 without Isaac Sim (Newton)
+
+Checked 2026-10-26 in the Isaac Lab sources and docs at tag `v3.0.0` (confidence high):
+
+- Isaac Lab 3.0 installs **Newton** as the default physics backend and runs **kit-less**, i.e. without Isaac Sim (Python 3.12, `./isaaclab.sh -i` or `uv`). Isaac Sim 6.2 is an optional extra (`isaacsim`). Backend selection per task: `physics=newton_mjwarp` (default for e.g. the Franka lift task), `physx` / `ovphysx` (PhysX without Isaac Sim via the `ovphysx` extra), `isaacsim_physx`.
+- Requirements of the Newton-only install: CUDA GPU from Turing on, driver >= 580.65.06 (PyTorch CUDA 13). Headless Newton needs no RTX; Isaac Sim's 16 GB VRAM / RTX requirements do not apply. An RTX 3060 Laptop (6 GB) is enough for headless grasp checks with a few hundred environments.
+- Assets without Kit: in-memory meshes via `MeshFileCfg(mesh=TrimeshObjectCfg(...))` (the mesh *file* converter needs Kit), URDF/MJCF import via the `importers` extra (`isaacsim-asset-isolated`), USD files directly. `isaaclab_assets` has `SO101_CFG` with a Newton SysID physics variant (full arm).
+- API changes relevant for scripts: `launch_simulation(cfg, args)` instead of `AppLauncher`, quaternions (x, y, z, w), data as `ProxyArray` (`.torch`), writers `write_root_pose_to_sim_index`, targets through `articulation.actuators.target_command.set_position_index`, external forces through `permanent_wrench_composer`.
+- Known issue: kit-less OpenUSD < 26.05 can crash on bodies with many colliders; workaround `PXR_WORK_THREAD_LIMIT=1`.
+- Newton materials must author friction (unset = 0). MJWarp has no CCD switch and ignores `joint_velocity_limit`.
+
+Used for [[state/sim-grasp-validation]].
 
 ## Three ways to use simulation for point cloud grasping
 

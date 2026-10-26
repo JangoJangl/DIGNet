@@ -3,13 +3,25 @@ title: Change log
 type: changelog
 status: active
 created: 2026-10-25
-updated: 2026-10-25
+updated: 2026-10-26
 tags: [changelog]
 related: ["[[state/problems]]", "[[state/ideas]]"]
 sources: [tests/test_core.py]
 ---
 
 # Change log
+
+## 2026-10-26 Grasp validation in Isaac Lab 3 / Newton
+
+| Change | Files |
+|---|---|
+| Export of validation predictions (or dataset grasps) to the mesh frame, fixed number of grasps per object | `sim_eval/export_grasps.py`, `sim_eval/episodes.py` |
+| Flying Franka Hand and SO-101 gripper assets (URDF, CoACD collision parts), Panda to SO-101 grasp transfer | `sim_eval/grippers.py` |
+| Object assets (mass, CoACD convex USD, convex hull, SDF) | `sim_eval/objects.py` |
+| Isaac Lab 3 kit-less Newton script: close, load in six directions, success 1/0 per grasp | `sim_eval/run_newton.py` |
+| Chunked evaluation, summary, wandb logging (`sim/success_franka`, `sim/success_so101`), Hub checkpoint watcher | `sim_eval/evaluate.py`, `sim_eval/report.py`, `sim_eval/watch_checkpoints.py` |
+
+Verification: `tests/test_sim_eval.py` (10 tests, CPU; the SO-101 asset test needs `SO101_DIR`). `run_newton.py` has not run on a GPU yet. See [[state/sim-grasp-validation]].
 
 ## 2026-10-25 (5) Resumable training
 
