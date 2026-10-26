@@ -22,6 +22,12 @@ dataset_fn:
     use_colors: False
     device: ${device}
     root_directory: ${root_path}
+    # augmentation of the training samples
+    random_rotation: ${random_rotation}
+    partial_view_prob: ${partial_view_prob}
+    jitter_sigma: ${jitter_sigma}
+    partial_mode: ${partial_mode}
+    eval_partial_view: ${eval_partial_view}
 
 
 seed: ${seed}

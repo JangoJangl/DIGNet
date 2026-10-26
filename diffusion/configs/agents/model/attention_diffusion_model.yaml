@@ -1,0 +1,27 @@
+# DDPM with local point tokens and a cross-attention denoiser
+_target_: networks.diffusion.point_diffusion.Diffusion
+_recursive_: false
+
+defaults:
+  - embedder: pointnet2_local # pointnet2_local, ptv3
+
+input_dim: ${grasp_dim}
+beta_schedule: ${beta_schedule}
+n_timesteps: ${n_timesteps}
+loss_type: 'l2'
+clip_denoised: true
+predict_epsilon: ${predict_epsilon}
+device: ${device}
+diffusion_x: ${diffusion_x}
+diffusion_x_M: ${diffusion_x_M}
+
+model:
+  _target_: networks.diffusion.attention_denoiser.CrossAttentionDenoiser
+  input_dim: ${grasp_dim}
+  cond_dim: ${token_dim}
+  hidden_dim: ${attention_hidden_dim}
+  num_layers: ${attention_layers}
+  num_heads: ${attention_heads}
+  k_neighbors: ${attention_k}
+  t_dim: ${t_dim}
+  device: ${device}

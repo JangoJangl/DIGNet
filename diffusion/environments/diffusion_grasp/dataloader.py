@@ -112,7 +112,8 @@ class GraspnetAcronymDataset(Dataset):
             path = os.path.join(self.h5_directory, self.file_names[self.idx].replace('.npz', '.h5'))
 
         trimesh = load_mesh(path, self.root_directory)
-        return self.processor(trimesh, torch.tensor(grasps, dtype=torch.get_default_dtype(), device=self.device))
+        return self.processor(trimesh, torch.tensor(grasps, dtype=torch.get_default_dtype(), device=self.device),
+                              augment=self.train_flag)
 
 
     def get_current(self):
@@ -123,14 +124,15 @@ class GraspnetAcronymDataset(Dataset):
         idx = self.idx
         if self.train_flag:
             (file_idx, batch_idx) = self.batches[idx]
-            grasps_npz = np.load(os.path.join(self.data_directory, self.file_list[file_idx]))
+            grasps_npz = np.load(os.path.join(self.data_directory, self.file_names[file_idx]))
             grasps = grasps_npz['grasp_transform'][grasps_npz['successful'].astype(bool)]
             grasps = grasps[batch_idx * self.sample_size:(batch_idx + 1) * self.sample_size]  # , self.contact_points[idx]
         else:
-            grasps_npz = np.load(os.path.join(self.data_directory, self.file_list[self.idx]))
+            grasps_npz = np.load(os.path.join(self.data_directory, self.file_names[self.idx]))
             grasps = grasps_npz['grasp_transform'][grasps_npz['successful'].astype(bool)]
 
-        path = os.path.join(self.h5_directory, self.file_list[self.idx].replace('.npz', '.h5'))
+        file_idx = self.batches[idx][0] if self.train_flag else idx
+        path = os.path.join(self.h5_directory, self.file_names[file_idx].replace('.npz', '.h5'))
         trimesh = load_mesh(path, self.root_directory)
         return self.processor(trimesh, torch.tensor(grasps, dtype=torch.get_default_dtype(), device=self.device)), trimesh
 

@@ -14,11 +14,13 @@ group: diffusion_grasp_first_try
 wandb:
   entity: kevin-jandl
   project: hierarchical_pointnet
+  run_id: null # set to the id of an earlier run to continue its curves when resuming
 
 diffusion_model: embedder_free_diffusion_model
 
 device: 'cuda'
 seed: 42
+dtype: float64 # default torch dtype; float32 is several times faster on consumer GPUs (needed for large models)
 #scale_data: true
 window_size: 1
 
@@ -64,10 +66,64 @@ use_ema: false
 model_target: networks.diffusion.diffusion_models.DiffusionMLPNetwork # networks.vision_encoder.diffusion_pointnet.Diffusion_Pointnet2
 predict_epsilon: true
 scaler: 'no_scale'
-batch_size: 1
-num_objects: 1
+batch_size: 32 # grasps per object in a training batch, all grasps of an object share one point cloud encoding
+num_objects: 8 # objects per training batch, the hierarchical_pointnet2 embedder only supports 1
+
+# augmentation of the training samples
+random_rotation: false # rotate object and grasps by a random rotation, required for arbitrary object poses
+partial_view_prob: 0.0 # probability to replace the full point cloud by a simulated single depth view
+jitter_sigma: 0.0 # gaussian point noise in metre, e.g. 0.002
+partial_mode: 'hpr' # 'hpr': hidden point removal on the surface sample, 'render': ray cast depth with sensor noise (needs Open3D)
+eval_partial_view: false # evaluate on partial views (same partial_mode) instead of full clouds
+
+# token embedders (pointnet2_local, ptv3) and the cross-attention denoiser
+# e.g. agents/model=attention_diffusion_model agents/model/embedder=ptv3
+token_dim: 256
+attention_hidden_dim: 256
+attention_layers: 2
+attention_heads: 4
+attention_k: 32 # tokens closest to the grasp that take part in the cross-attention
+
+pointnet2_width: 1 # channel multiplier of the pointnet2_local set abstraction MLPs
+
+# flow matching (agents/model=flow_matching_model)
+flow_steps: 10 # Euler steps on SE(3) at sampling time
+flow_time_sampling: 'uniform' # 'uniform' or 'beta' (more weight close to the data)
 
 # evaluation params
+num_eval_samples: 100 # grasps generated per test object
+max_eval_objects: 50 # null evaluates the whole test split
+symmetric_metric: true # treat 180 degree flipped parallel jaw grasps as identical in the metrics
+visualize_at: [0.25, 0.5, 0.75, 1.0] # fractions of max_train_steps with prediction plots in wandb (val_grasps, val_3d)
+num_vis_objects: 4 # test objects shown in these plots
+
+# checkpoints and the resolved config are pushed to a Hugging Face model repo when repo_id is set,
+# e.g. hub.repo_id=<user>/dignet-grasp, needs HF_TOKEN or huggingface-cli login
+hub:
+  repo_id: null
+  private: true
+
+# training state (model, optimizer, EMA, step) is saved to <run dir>/last every checkpoint_every_n_steps
+# (null: every eval_every_n_steps) and pushed to the hub with the checkpoints.
+# resume: local file or folder, or '<hf_repo_id>:runs/<run>/last/training_state.pth'
+checkpoint_every_n_steps: null
+resume: null
+
+# unified datasets of dataset_tools/build_dataset.py (workspaces=unified_grasp_manager)
+unified:
+  paths: [] # folders or HF repo ids, mixed in one training, e.g. [/data/unified/acronym_full, /data/unified/acronym_partial]
+  grippers: [franka_panda]
+  cloud_types: [full, partial]
+  sources: null # null = all, e.g. [acronym, graspgen]
+  test_split: test
+  max_eval_grasps: 1000
+
+# python visualize_dataset.py dataset_vis.split=test dataset_vis.indices=[0,7,42] partial_view_prob=1.0
+dataset_vis:
+  split: train # train samples include the augmentation (rotation, partial views, jitter)
+  indices: [0, 1, 2, 3]
+  max_grasps: 30
+  wandb: false # also log the figure to wandb
 
 evaluation: false
 pretrained_model_path: "/home/i53/student/jandl/repos/DIGNet/logs/cluster/grasping_end_to_end_learning/runs/2023-07-22/23-55-20_architecture_optimization"

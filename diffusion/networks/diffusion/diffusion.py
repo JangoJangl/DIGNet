@@ -45,7 +45,8 @@ class Diffusion(nn.Module):
             self.betas = cosine_beta_schedule(n_timesteps).to(self.device)
         elif beta_schedule == 'vp':
             self.betas = vp_beta_schedule(n_timesteps).to(self.device)
-        self.betas = vp_beta_schedule(n_timesteps).to(self.device)
+        else:
+            raise ValueError(f"Unknown beta_schedule '{beta_schedule}', expected linear, cosine or vp")
         self.model = hydra.utils.instantiate(model)
         self.n_timesteps = n_timesteps
         self.clip_denoised = clip_denoised

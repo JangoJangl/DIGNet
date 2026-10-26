@@ -1,0 +1,35 @@
+# Conditional flow matching on SE(3), needs representation=se3_pseudo_log_map_representation, grasp_dim=6, scaler=no_scale
+_target_: networks.diffusion.flow_matching.FlowMatching
+_recursive_: false
+
+defaults:
+  - embedder: pointnet2_local # pointnet2_local, ptv3 (vnn_pointnet2 / pointnet2 work with the MLP denoiser below)
+
+input_dim: ${grasp_dim}
+n_steps: ${flow_steps}
+trans_scale: 0.1 # metre per unit of the normalised translation, the prior is N(0, trans_scale^2)
+rot_loss_weight: 1.0
+time_sampling: ${flow_time_sampling}
+device: ${device}
+
+model:
+  _target_: networks.diffusion.attention_denoiser.CrossAttentionDenoiser
+  input_dim: 9 # translation + 6D rotation of the current pose
+  output_dim: 6 # translation velocity + body angular velocity
+  cond_dim: ${token_dim}
+  hidden_dim: ${attention_hidden_dim}
+  num_layers: ${attention_layers}
+  num_heads: ${attention_heads}
+  k_neighbors: ${attention_k}
+  t_dim: ${t_dim}
+  device: ${device}
+#  global embedders (return_tokens false) with the residual MLP instead:
+#  _target_: networks.diffusion.diffusion_models.DiffusionMLPNetwork
+#  input_dim: 9
+#  output_dim: 6
+#  cond_dim: ${embedding_dim}
+#  t_dim: ${t_dim}
+#  hidden_dim: ${hidden_dim}
+#  num_hidden_layers: ${num_hidden_layers}
+#  activation: ${activation}
+#  device: ${device}

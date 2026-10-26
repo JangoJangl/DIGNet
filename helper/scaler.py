@@ -8,8 +8,13 @@ class Scaler(object):
     def __init__(self, device='cuda', root_directory='/home/temp_store/jandl/Dataset/acronym'):
         data_object = {}
         grasp_data = {}
-        npz_object = np.load(os.path.join(root_directory, 'object_statistics.npz'))
-        npz_grasp = np.load(os.path.join(root_directory, 'grasp_statistics.npz'))
+        stats = [os.path.join(root_directory, f) for f in ('object_statistics.npz', 'grasp_statistics.npz')]
+        if not all(os.path.exists(f) for f in stats):
+            # only the statistics based scalers need these files, no_scale works without them
+            self.grasp_mean = self.grasp_var = self.grasp_min = self.grasp_max = None
+            return
+        npz_object = np.load(stats[0])
+        npz_grasp = np.load(stats[1])
         for k in npz_object.files:
             data_object[k] = npz_object[k]
         for k in npz_grasp.files:
@@ -52,11 +57,16 @@ class Scaler(object):
         :param obj: Torch.tensor
         :param grasps: Torch.tensor
         """
-        grasps = grasps - self.grasp_mean(self.representations[representation]) / torch.sqrt(self.grasp_var(self.representations[representation]))
-        obj = obj - self.grasp_mean(self.representations["trans"]) / torch.sqrt(self.grasp_var(self.representations["trans"]))
+        idx = self.representations[representation]
+        trans_idx = self.representations["trans"]
+        grasp_mean, grasp_std = self.grasp_mean[idx], torch.sqrt(self.grasp_var[idx])
+        trans_mean, trans_std = self.grasp_mean[trans_idx], torch.sqrt(self.grasp_var[trans_idx])
+        grasps = (grasps - grasp_mean) / grasp_std
+        obj = obj.clone()
+        obj[:, :3] = (obj[:, :3] - trans_mean) / trans_std
 
-        def inverse(grasps):
-            return grasps * torch.sqrt(self.grasp_var(self.representations[representation])) + self.grasp_mean(self.representations[representation])
+        def inverse(g):
+            return g * grasp_std + grasp_mean
 
         return obj, grasps, inverse
 

@@ -15,7 +15,7 @@ class Transform(object):
         obj = obj.apply_transform(t_mean)
 
         f2w = finger_center_to_wrist()  # translate COS to finger center
-        grasps = torch.matmul(grasps, torch.from_numpy(f2w).cuda())
+        grasps = torch.matmul(grasps, torch.from_numpy(f2w).to(device=grasps.device, dtype=grasps.dtype))
 
         return obj, grasps
 

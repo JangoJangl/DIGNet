@@ -45,7 +45,8 @@ class Diffusion(nn.Module):
             self.betas = cosine_beta_schedule(n_timesteps).to(self.device)
         elif beta_schedule == 'vp':
             self.betas = vp_beta_schedule(n_timesteps).to(self.device)
-        self.betas = vp_beta_schedule(n_timesteps).to(self.device)
+        else:
+            raise ValueError(f"Unknown beta_schedule '{beta_schedule}', expected linear, cosine or vp")
         self.model = hydra.utils.instantiate(model)
         self.n_timesteps = n_timesteps
         self.clip_denoised = clip_denoised
@@ -337,18 +338,35 @@ class Diffusion(nn.Module):
         Computes the batch loss for the diffusion model
         '''
         batch_size = len(x)
-        condition, _ = self.embedder(condition_pc)
+        condition, num_objects = self.embedder(condition_pc)
+        # x holds num_objects * grasps_per_object grasps (object-major), the embedder returns one
+        # embedding per object, so the embedding is shared by all grasps of the same object
+        condition = self.repeat_condition(condition, num_objects, batch_size)
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
         return self.p_losses(x, condition, t, weights, gram_schmidt=gram_schmidt)
 
-    def forward(self, condition_pc, gram_schmidt=False, *args, **kwargs):
+    @staticmethod
+    def repeat_condition(condition, num_objects, batch_size):
         '''
-        General forward method, which generates samples given the chosen condition
+        Repeats a per object embedding [num_objects, D] to a per grasp embedding [batch_size, D].
+        Hierarchical embedders return a list of (xyz, features) tuples and are left untouched,
+        they only support a single object per batch.
         '''
-        condition, B = self.embedder(condition_pc)
-        # nn, nn_features = self.get_nearest_neighbors(xyz_list, feature_list)
-        # condition = self.align_model(nn, nn_features)
-        return self.sample(condition, B, *args, **kwargs)
+        if not torch.is_tensor(condition) or condition.shape[0] == batch_size:
+            return condition
+        if batch_size % num_objects != 0:
+            raise ValueError(f"{batch_size} grasps can not be split evenly over {num_objects} objects")
+        return torch.repeat_interleave(condition, batch_size // num_objects, dim=0)
+
+    def forward(self, condition_pc, gram_schmidt=False, num_samples=1, *args, **kwargs):
+        '''
+        General forward method, which generates num_samples grasps per object of the condition batch.
+        The samples are returned object-major with shape [num_objects * num_samples, input_dim].
+        '''
+        condition, num_objects = self.embedder(condition_pc)
+        batch_size = num_objects * num_samples
+        condition = self.repeat_condition(condition, num_objects, batch_size)
+        return self.sample(condition, batch_size, gram_schmidt, *args, **kwargs)
 
     def sample_t_middle(self, condition: torch.Tensor):
         """

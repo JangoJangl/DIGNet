@@ -44,7 +44,8 @@ class Diffusion(nn.Module):
             self.betas = cosine_beta_schedule(n_timesteps).to(self.device)
         elif beta_schedule == 'vp':
             self.betas = vp_beta_schedule(n_timesteps).to(self.device)
-        self.betas = vp_beta_schedule(n_timesteps).to(self.device)
+        else:
+            raise ValueError(f"Unknown beta_schedule '{beta_schedule}', expected linear, cosine or vp")
         self.model = hydra.utils.instantiate(model)
         self.n_timesteps = n_timesteps
         self.clip_denoised = clip_denoised
@@ -75,6 +76,23 @@ class Diffusion(nn.Module):
         self.diffusion_x = diffusion_x
         self.diffusion_x_M = diffusion_x_M
     
+    def points_in_gripper_frame(self, x: torch.Tensor, condition: torch.Tensor):
+        '''
+        Expresses the object points in the frame of the (noisy) grasp, so that the network sees the
+        object from the gripper's point of view.
+
+        :param x: noisy grasps in the diffusion space [B, D]
+        :param condition: homogeneous object points [B, 4, N]
+        :return: points in the gripper frame [B, N, 3]
+        '''
+        H_t = self.inv_fct(x)  # gripper -> object
+        R_inv = H_t[:, :3, :3].transpose(1, 2)
+        H_inv = torch.zeros_like(H_t)
+        H_inv[:, :3, :3] = R_inv
+        H_inv[:, :3, 3] = -torch.matmul(R_inv, H_t[:, :3, 3:4]).squeeze(-1)
+        H_inv[:, 3, 3] = 1.0
+        return torch.transpose(torch.matmul(H_inv.to(condition.dtype), condition), 1, 2)[..., :3]
+
     def get_params(self):
         '''
         Helper method to get all model parameters
@@ -174,9 +192,7 @@ class Diffusion(nn.Module):
         # start the inverse diffusion process to generate the input conditioned on the noise
         for i in reversed(range(0, self.n_timesteps)):
             timesteps = torch.full((batch_size,), i, device=self.device, dtype=torch.long)
-            H_t = self.inv_fct(x)
-
-            p_t = torch.transpose(torch.matmul(H_t, condition), 1,2)[..., :3]
+            p_t = self.points_in_gripper_frame(x, condition)
             x = self.p_sample(x, timesteps, p_t)
             # if we want to return the complete chain add thee together
             if return_diffusion: 
@@ -190,7 +206,7 @@ class Diffusion(nn.Module):
 
             timesteps = torch.full((batch_size,), 0, device=self.device, dtype=torch.long)
             for m in range(0, self.diffusion_x_M):
-                x = self.p_sample(x, timesteps, condition)
+                x = self.p_sample(x, timesteps, self.points_in_gripper_frame(x, condition))
                 if return_diffusion:
                     diffusion.append(x)
 
@@ -324,8 +340,7 @@ class Diffusion(nn.Module):
 
         ones = torch.ones((condition.shape[0], condition.shape[1], 1), device=self.device)
         condition = torch.transpose(torch.cat([condition, ones], dim=-1), 1, 2)
-        H_t = self.inv_fct(x_noisy)
-        p_t = torch.transpose(torch.matmul(H_t, condition), 1, 2)[..., :3]
+        p_t = self.points_in_gripper_frame(x_noisy, condition)
         x_recon = self.model(p_t, t)
 
         assert noise.shape == x_recon.shape
@@ -342,14 +357,19 @@ class Diffusion(nn.Module):
         Computes the batch loss for the diffusion model
         '''
         batch_size = len(x)
+        # x holds num_objects * grasps_per_object grasps (object-major), every grasp needs its point cloud
+        if condition.shape[0] != batch_size:
+            condition = torch.repeat_interleave(condition, batch_size // condition.shape[0], dim=0)
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
         return self.p_losses(x, condition, t, weights, gram_schmidt=gram_schmidt)
 
-    def forward(self, condition, gram_schmidt=False, *args, **kwargs):
+    def forward(self, condition, gram_schmidt=False, num_samples=1, *args, **kwargs):
         '''
-        General forward method, which generates samples given the chosen condition
+        General forward method, which generates num_samples grasps for every point cloud of the condition batch
         '''
-        return self.sample(condition, *args, **kwargs)
+        if num_samples > 1:
+            condition = torch.repeat_interleave(condition, num_samples, dim=0)
+        return self.sample(condition, gram_schmidt, *args, **kwargs)
 
     def sample_t_middle(self, condition: torch.Tensor):
         """

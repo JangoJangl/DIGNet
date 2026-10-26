@@ -34,7 +34,7 @@ class DiffusionMLPNetwork(nn.Module):
             residual_style: bool = True,
             hidden_dim: int = 100,
             num_hidden_layers: int = 1,
-            output_dim=1,
+            output_dim=None,
             dropout: int = 0,
             activation: str = "ReLU",
             use_spectral_norm: bool = False,
@@ -47,8 +47,8 @@ class DiffusionMLPNetwork(nn.Module):
         self.network_type = "mlp"
         self.device = device
         self.cond_mask_prob = cond_mask_prob
-        # number of samples per batch
-        output_dim = input_dim
+        # the output matches the input unless set explicitly (flow matching: 9D pose in, 6D velocity out)
+        output_dim = input_dim if output_dim is None else output_dim
         # define the input dimension for the model
         input_dim = cond_dim + input_dim + t_dim
         # time embedding model 

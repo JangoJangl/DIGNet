@@ -6,8 +6,13 @@ import torch
 import copy
 import numpy as np
 from helper.transform import wrist_to_finger_center as w2f
-from alr_sim.utils.sim_path import sim_framework_path
-from alr_sim.utils.geometric_transformation import quat2mat
+try:  # the Panda meshes (gripper rendering, collision metric) come from the ALR simulation framework
+    from alr_sim.utils.sim_path import sim_framework_path
+    from alr_sim.utils.geometric_transformation import quat2mat
+    GRIPPER_MESHES_AVAILABLE = True
+except ImportError:  # e.g. Colab: training works, the gripper collision metric is skipped
+    sim_framework_path = quat2mat = None
+    GRIPPER_MESHES_AVAILABLE = False
 from collections.abc import Iterable
 
 

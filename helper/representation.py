@@ -1,6 +1,9 @@
 import numpy as np
 import torch
-import pytorch3d.transforms as p3d_t
+try:
+    import pytorch3d.transforms as p3d_t
+except ImportError:  # only the 6D and quaternion representations need PyTorch3D
+    p3d_t = None
 from theseus.geometry import se3, so3
 
 
@@ -68,7 +71,8 @@ class Representation(object):
         translation = tensor_6d_rotation[:, :3]
         rot_6d = tensor_6d_rotation[:, 3:]
         rotation = p3d_t.rotation_6d_to_matrix(rot_6d)
-        transform = torch.from_numpy(np.repeat(np.expand_dims(np.eye(4), axis=0), len(tensor_6d_rotation), axis=0)).to('cuda')
+        transform = torch.from_numpy(np.repeat(np.expand_dims(np.eye(4), axis=0), len(tensor_6d_rotation), axis=0)).to(
+            device=tensor_6d_rotation.device, dtype=tensor_6d_rotation.dtype)
         transform[:, :3, :3] = rotation
         transform[:, :3, 3] = translation
         return transform
@@ -82,7 +86,8 @@ class Representation(object):
         translation = tensor_trans_quat[:, :3]
         quat = tensor_trans_quat[:, 3:]
         rotation = p3d_t.quaternion_to_matrix(quat)
-        transform = torch.repeat_interleave(torch.from_numpy(np.eye(4)).unsqueeze(0), len(tensor_trans_quat), dim=0).to('cuda')
+        transform = torch.repeat_interleave(torch.from_numpy(np.eye(4)).unsqueeze(0), len(tensor_trans_quat), dim=0).to(
+            device=tensor_trans_quat.device, dtype=tensor_trans_quat.dtype)
         transform[:, :3, :3] = rotation
         transform[:, :3, 3] = translation
         return transform
@@ -99,7 +104,7 @@ class Representation(object):
         so3_vec = tensor[:, 3:]
         rotation = so3.SO3.exp_map(so3_vec)
         transform = torch.repeat_interleave(torch.from_numpy(np.eye(4)).unsqueeze(0), len(tensor), dim=0).to(
-            'cuda')
+            device=tensor.device, dtype=tensor.dtype)
         transform[:, :3, :3] = rotation.to_matrix()
         transform[:, :3, 3] = translation
         return transform

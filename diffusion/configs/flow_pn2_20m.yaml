@@ -1,0 +1,51 @@
+# PointNet++ (local tokens) + cross-attention denoiser + SE(3) flow matching, about 20 M parameters
+# (encoder 3.5 M with pointnet2_width 3, denoiser 16.9 M with 5 layers x 512), trained on full + partial clouds.
+#
+#   python training.py --config-name flow_pn2_20m unified.paths=[/data/unified/acronym_full,/data/unified/acronym_partial]
+#
+defaults:
+  - train_config
+  - override agents/model: flow_matching_model
+  - override agents/model/embedder: pointnet2_local
+  - override workspaces: unified_grasp_manager
+  - _self_
+
+group: flow_pn2_20m
+dtype: float32 # float64 would be several times slower for a model of this size
+
+token_dim: 512
+pointnet2_width: 3
+attention_hidden_dim: 512
+attention_layers: 5
+attention_heads: 8
+attention_k: 32
+
+representation: se3_pseudo_log_map_representation
+grasp_dim: 6
+scaler: no_scale
+pc_dim: 1024
+flow_steps: 10
+flow_time_sampling: beta
+
+num_objects: 16 # observations per batch
+batch_size: 32 # grasps per observation
+max_train_steps: 300000
+eval_every_n_steps: 10000
+max_eval_objects: 200
+num_eval_samples: 200
+
+use_ema: true
+decay: 0.999
+
+random_rotation: true # full clouds in arbitrary poses; partial clouds are already in the camera frame
+jitter_sigma: 0.001
+
+agents:
+  optimization:
+    _target_: torch.optim.AdamW
+    lr: 2e-4
+    weight_decay: 1e-4
+
+unified:
+  paths: [] # set on the command line
+  cloud_types: [full, partial]

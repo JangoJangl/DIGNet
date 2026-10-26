@@ -65,6 +65,15 @@ model_target: networks.diffusion.diffusion_models.DiffusionMLPNetwork
 predict_epsilon: true
 scaler: 'var_scale'
 # evaluation params
+num_eval_samples: 100
+max_eval_objects: null
+symmetric_metric: true
+visualize_at: []
+num_vis_objects: 4
+hub:
+  repo_id: null
+  private: true
+checkpoint_every_n_steps: null
 
 evaluation: True
 pretrained_model_path: "/home/i53/student/jandl/repos/DIGNet/logs/cluster/grasping_end_to_end_learning/runs/2023-07-22/23-55-20_architecture_optimization"

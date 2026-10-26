@@ -1,0 +1,41 @@
+# training on the unified datasets of dataset_tools/build_dataset.py, e.g. full + partial ACRONYM
+_target_: workspaces.diffusion_grasp_workspace_manager.DiffusionGraspManager
+_recursive_: false
+
+dataset_fn:
+  _target_: environments.diffusion_grasp.unified_dataset.get_train_val
+  paths: ${unified.paths}
+  data_directory: ${unified.paths} # only logged by the workspace manager
+  subbatch_size: ${batch_size} # successful grasps per observation in a training batch
+  num_points: ${pc_dim}
+  grippers: ${unified.grippers}
+  cloud_types: ${unified.cloud_types}
+  sources: ${unified.sources}
+  test_split: ${unified.test_split}
+  max_eval_grasps: ${unified.max_eval_grasps}
+  device: ${device}
+  processor:
+    _target_: processors.diffusion_grasp_processor.DiffusionGraspProcessor
+    representation: ${representation}
+    sampler: 'poisson_disk_sample' # unused, the clouds are precomputed
+    transform: 'center_transform'
+    scaler: ${scaler}
+    scale_factor: 1
+    num_points: ${pc_dim}
+    use_normals: false
+    use_colors: false
+    device: ${device}
+    root_directory: ${root_path}
+    random_rotation: ${random_rotation}
+    jitter_sigma: ${jitter_sigma}
+
+seed: ${seed}
+train_batch_size: ${num_objects}
+test_batch_size: 1
+num_workers: 0
+pin_memory: False
+eval_n_times: 100
+eval_n_steps: 300
+device: ${device}
+train_fraction: 0.95
+render: False
