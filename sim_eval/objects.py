@@ -12,6 +12,7 @@ import os
 import numpy as np
 
 COLLISION_MODES = ('coacd', 'convex_hull', 'sdf')
+MESH_PREPS = ('raw', 'graspgen')
 COACD_MAX_HULLS = 24
 
 
@@ -24,6 +25,31 @@ def load_mesh(object_root, mesh_file, scale):
     mesh = trimesh.load(path, force='mesh', skip_materials=True)
     mesh.apply_scale(scale)
     return mesh
+
+
+def watertight_simplified(mesh, cache_dir, key, voxels=128, max_faces=5000):
+    """
+    Watertight, decimated version of a mesh, the kind of mesh the GraspGen labels were simulated on
+    (GraspGen download_objects.py --simplify: Manifold, then simplify). Approximated without these tools: the surface
+    is voxelized (voxels along the longest side), enclosed space is filled, the boundary is extracted with marching
+    cubes and decimated to max_faces. Open shells become walls of about one voxel. Cached as npz.
+    """
+    path = os.path.join(cache_dir, f'{key}.npz')
+    import trimesh
+    if os.path.exists(path):
+        data = np.load(path)
+        return trimesh.Trimesh(data['vertices'], data['faces'])
+    pitch = mesh.extents.max() / voxels
+    grid = mesh.voxelized(pitch).fill()
+    out = grid.marching_cubes.apply_transform(grid.transform)  # marching cubes are in voxel indices
+    if len(out.faces) > max_faces:
+        import fast_simplification
+        v, f = fast_simplification.simplify(out.vertices, out.faces, target_reduction=1.0 - max_faces / len(out.faces))
+        out = trimesh.Trimesh(v, f)
+    out.fix_normals()
+    os.makedirs(cache_dir, exist_ok=True)
+    np.savez(path, vertices=np.asarray(out.vertices, np.float64), faces=np.asarray(out.faces, np.int64))
+    return out
 
 
 def object_mass(mesh, density=400.0, min_mass=0.02, max_mass=1.0):
@@ -117,18 +143,25 @@ def write_convex_usd(parts, path, mass, visual_mesh=None, friction=1.0):
     return path
 
 
-def prepare_object(record, object_root, cache_dir, collision='coacd', density=400.0):
+def prepare_object(record, object_root, cache_dir, collision='coacd', density=400.0, mesh_prep='raw'):
     """
     record: dict with mesh_file and scale. Returns dict(mesh=trimesh, mass, usd=path or None) and writes the USD
-    for the coacd mode (cached by mesh file, scale and mode).
+    for the coacd mode (cached by mesh file, scale and mode). mesh_prep='graspgen' simulates a watertight, decimated
+    version of the mesh (watertight_simplified).
     """
     if collision not in COLLISION_MODES:
         raise ValueError(f'collision must be one of {COLLISION_MODES}')
+    if mesh_prep not in MESH_PREPS:
+        raise ValueError(f'mesh_prep must be one of {MESH_PREPS}')
     mesh = load_mesh(object_root, record['mesh_file'], float(record['scale']))
+    if mesh_prep == 'graspgen':
+        key = _cache_key(record['mesh_file'], float(record['scale']), mesh_prep)
+        mesh = watertight_simplified(mesh, cache_dir, key)
     mass = object_mass(mesh, density)
     usd = None
     if collision == 'coacd':
-        key = _cache_key(record['mesh_file'], float(record['scale']), collision)
+        key = _cache_key(record['mesh_file'], float(record['scale']), collision if mesh_prep == 'raw' else
+                         f'{collision}-{mesh_prep}')
         usd = os.path.join(cache_dir, f'{key}.usda')
         if not os.path.exists(usd):
             parts = pad_parts(coacd_parts(mesh, cache_dir, key), COACD_MAX_HULLS)

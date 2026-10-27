@@ -68,6 +68,8 @@ parser.add_argument('--cone', choices=('pyramidal', 'elliptic'), default='ellipt
 parser.add_argument('--impratio', type=float, default=100.0,
                     help='friction to normal impedance ratio, high values stop objects creeping out along the pads')
 parser.add_argument('--keep-colliding', action='store_true')
+parser.add_argument('--mesh-prep', choices=('raw', 'graspgen'), default='raw',
+                    help='graspgen: simulate a watertight, decimated mesh like the GraspGen labels (see objects.py)')
 parser.add_argument('--protocol', choices=('dignet', 'graspdatagen'), default='dignet')
 parser.add_argument('--env-spacing', type=float, default=1.0)
 parser.add_argument('--video', default=None, help='record the run headless to this mp4 (Newton GL, half speed)')
@@ -195,7 +197,8 @@ def main():
     prepared, grasp_rows = {}, {}
     for obj in objects:
         prepared[obj] = prepare_object(episodes['objects'][obj], args.object_root,
-                                       os.path.join(args.cache_dir, 'objects'), args.collision, args.density)
+                                       os.path.join(args.cache_dir, 'objects'), args.collision, args.density,
+                                       args.mesh_prep)
         if args.protocol == 'graspdatagen':
             prepared[obj]['mass'] = 1.0
         idx = rows[episodes['object_index'][rows] == obj]

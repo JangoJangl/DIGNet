@@ -63,7 +63,10 @@ Things to tune if they are off: `--friction`, `--effort`, `--load-g`, `--collisi
 `--dt`, `--substeps`, `--contact-ke/--contact-kd`, `--cone`, `--impratio`. With `use_mujoco_contacts=False` MJWarp takes
 the shape `ke`/`kd` as contact stiffness/damping in N/m; Newton's default `ke = 2500` lets the fingers sink in by
 centimetres at 70 N, hence `--contact-ke 1e5`. A pyramidal cone or a low `impratio` lets the objects creep out along
-the pads (defaults: elliptic, 100). Use `--objects-per-chunk` to fit the GPU memory (6 GB:
+the pads (defaults: elliptic, 100). `--mesh-prep graspgen` simulates watertight, decimated meshes like the ones the GraspGen
+labels were made on (approximated with voxelization + marching cubes + fast-simplification instead of the Manifold
+tools; needs scikit-image). On the 8 calibration objects it changed little (label 1 / label 0 success 44/23 % raw,
+41/24 % coacd and 42/21 % sdf on prepared meshes); the failures concentrate on a few objects (thin sheets). Use `--objects-per-chunk` to fit the GPU memory (6 GB:
 start with 8 objects x 32 grasps = 256 environments).
 
 ## 3. Evaluate a checkpoint

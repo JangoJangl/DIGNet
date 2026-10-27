@@ -161,6 +161,17 @@ def test_pad_parts_keeps_padding_inside():
         assert box.contains(v).all() and trimesh.Trimesh(v, f).volume > 0
 
 
+def test_watertight_simplified_keeps_frame(tmp_path):
+    pytest.importorskip('skimage')
+    from sim_eval.objects import watertight_simplified
+    shell = trimesh.creation.box(extents=(0.04, 0.02, 0.06))
+    shell.apply_translation((0.3, -0.1, 0.05))
+    shell.update_faces(np.arange(len(shell.faces)) != 0)  # open shell, like many Objaverse meshes
+    out = watertight_simplified(shell, str(tmp_path), 'box', voxels=64, max_faces=2000)
+    assert np.abs(out.bounds - shell.bounds).max() < 2 * 0.06 / 64
+    assert len(out.faces) <= 2000
+
+
 def test_summary():
     rows = []
     for i in range(10):
