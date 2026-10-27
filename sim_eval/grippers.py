@@ -32,6 +32,7 @@ SO101_LINK_TO_FRAME = rpy(0.0, np.pi, 0.0, (-0.0079, -0.000218121, -0.0981274)) 
 SO101_CONTACT_Z = -0.010     # pad centre, the jaw tips end at z = +0.005
 SO101_FIXED_JAW_X = 0.002    # inner surface of the fixed jaw at the pad centre
 SO101_JAW_LIMITS = (-0.174533, 1.74533)
+SO101_JAW_JOINT = rpy(1.5708, -5.24284e-08, -1.41553e-15, (0.0202, 0.0188, -0.0234))  # joint 'gripper', in gripper_link
 # inner surface x of the moving jaw at SO101_CONTACT_Z over the joint angle (above 0.75 rad the jaw has left the pad
 # depth, i.e. 0.75 rad is the widest opening that still closes along the pads)
 SO101_JAW_TABLE_Q = np.array([-0.15, -0.05, 0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75])
@@ -147,6 +148,56 @@ def root_poses(gripper, grasps, mesh=None):
         q_open.append([q])
         fits.append(f)
     return np.array(poses), np.array(q_open), np.array(fits)
+
+
+def convex_halfspaces(meshes):
+    """ convex meshes -> list of (normals [F, 3], offsets [F]) with n . p <= offset inside """
+    out = []
+    for m in meshes:
+        hull = m.convex_hull
+        normals = np.asarray(hull.face_normals)
+        out.append((normals, np.einsum('ij,ij->i', normals, hull.triangles[:, 0])))
+    return out
+
+
+def colliding(points, halfspaces, margin=0.001):
+    """ any of the points (gripper root frame) inside any convex part grown by margin """
+    for normals, offsets in halfspaces:
+        if (points @ normals.T <= offsets + margin).all(axis=1).any():
+            return True
+    return False
+
+
+def back_off(pose, root_to_tcp, object_points, halfspaces, step=0.002, max_offset=0.02, margin=0.001):
+    """
+    Moves a gripper root pose (object frame) back along the approach axis in steps until the convex collision parts
+    (root frame, at the pre-grasp opening) are free of the object surface points. Returns the pose and the offset;
+    the offset is nan if the gripper still collides at max_offset (the pose at max_offset is returned).
+    """
+    for offset in np.arange(0.0, max_offset + 1e-9, step):
+        moved = pose @ root_to_tcp @ translation(z=-offset) @ invert(root_to_tcp)
+        points = (invert(moved) @ np.c_[object_points, np.ones(len(object_points))].T).T[:, :3]
+        if not colliding(points, halfspaces, margin):
+            return moved, float(offset)
+    return moved, float('nan')
+
+
+def transform_halfspaces(halfspaces, t):
+    """ half-spaces of convex parts moved by the transform t """
+    return [(normals @ t[:3, :3].T, offsets + normals @ t[:3, :3].T @ t[:3, 3]) for normals, offsets in halfspaces]
+
+
+def so101_collision_halfspaces(asset_dir):
+    """
+    Convex collision parts of the SO-101 gripper (written by so101_urdf): half-spaces of the gripper_link parts and
+    a function jaw angle -> half-spaces of all parts, in the gripper_link frame
+    """
+    import glob
+    import trimesh
+    files = sorted(glob.glob(os.path.join(asset_dir, 'so101_collision', '*.stl')))
+    body = convex_halfspaces([trimesh.load(f) for f in files if not os.path.basename(f).startswith('jaw')])
+    jaw = convex_halfspaces([trimesh.load(f) for f in files if os.path.basename(f).startswith('jaw')])
+    return lambda q: body + transform_halfspaces(jaw, SO101_JAW_JOINT @ rpy(0.0, 0.0, q))
 
 
 # ------------------------------------------------------------------------------------------------ URDF assets

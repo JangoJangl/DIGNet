@@ -3,7 +3,8 @@ Executes grasps of an episode file with a flying gripper in Isaac Lab 3 on the N
 Isaac Sim is not needed (kit-less Isaac Lab, see sim_eval/README.md).
 
 One environment per grasp. The gripper root is fixed in its environment (approach axis pointing down) and the object
-is placed relative to it, so that the gripper is at the grasp pose. Gravity is off; instead the test applies an inertial load to the object:
+is placed relative to it, so that the gripper is at the grasp pose. Gravity is off; instead the test applies an
+inertial load to the object:
 
   settle  0.10 s  fingers open, no load. The object moving more than 5 mm means the open gripper collides with it
   close   0.60 s  position target "closed" with limited effort (Franka 70 N per finger, target moving at 0.1 m/s;
@@ -77,6 +78,9 @@ parser.add_argument('--cone', choices=('pyramidal', 'elliptic'), default='ellipt
 parser.add_argument('--impratio', type=float, default=100.0,
                     help='friction to normal impedance ratio, high values stop objects creeping out along the pads')
 parser.add_argument('--keep-colliding', action='store_true')
+parser.add_argument('--back-off', type=float, default=0.0,
+                    help='SO-101: move back along the approach axis in 2 mm steps up to this distance until the open '
+                    'gripper is free of the object (0: off)')
 parser.add_argument('--mesh-prep', choices=('raw', 'graspgen'), default='raw',
                     help='graspgen: simulate a watertight, decimated mesh like the GraspGen labels (see objects.py)')
 parser.add_argument('--protocol', choices=('dignet', 'graspdatagen'), default='dignet')
@@ -92,7 +96,8 @@ if args.video:  # EGL offscreen rendering also when a display is set (pyglet dec
 import numpy as np  # noqa: E402
 
 from sim_eval.episodes import load_episodes  # noqa: E402
-from sim_eval.grippers import SPECS, franka_urdf, root_poses, so101_urdf  # noqa: E402
+from sim_eval.grippers import (SPECS, back_off, franka_urdf, root_poses, so101_collision_halfspaces,  # noqa: E402
+                               so101_urdf)
 from sim_eval.objects import prepare_object  # noqa: E402
 from sim_eval.transforms import invert, matrix_from_pose7, pose7_from_matrix  # noqa: E402
 
@@ -208,6 +213,7 @@ def main():
         if not os.path.exists(os.path.join(args.so101_dir, 'so101_new_calib.urdf')):
             sys.exit('--so101-dir must point to SO-ARM100/Simulation/SO101')
         urdf = so101_urdf(args.so101_dir, asset_dir)
+        halfspaces = so101_collision_halfspaces(asset_dir)
 
     # object assets and the gripper root pose / pre-grasp opening of every grasp (CPU, before the simulation)
     prepared, grasp_rows = {}, {}
@@ -219,7 +225,14 @@ def main():
             prepared[obj]['mass'] = 1.0 if args.mass is None else args.mass
         idx = rows[episodes['object_index'][rows] == obj]
         poses, q_open, fits = root_poses(args.gripper, episodes['grasps'][idx], prepared[obj]['mesh'])
-        grasp_rows[obj] = list(zip(idx, poses, q_open, fits))
+        offsets = np.zeros(len(idx))
+        if args.gripper == 'so101' and args.back_off > 0:  # the wrist and servo body often hit the object
+            import trimesh
+            points = trimesh.sample.sample_surface_even(prepared[obj]['mesh'], 5000, seed=0)[0]
+            for j in range(len(idx)):
+                poses[j], offsets[j] = back_off(poses[j], spec.root_to_tcp, points, halfspaces(q_open[j, 0]),
+                                                max_offset=args.back_off)
+        grasp_rows[obj] = list(zip(idx, poses, q_open, fits, offsets))
     num_envs = len(objects) * k
 
     from isaaclab_newton.physics import MJWarpSolverCfg, NewtonCfg, NewtonCollisionPipelineCfg, NewtonShapeCfg
@@ -295,6 +308,7 @@ def main():
         root_in_obj = np.stack([a[1] for a in assigned])
         q_open = np.stack([a[2] for a in assigned])
         fits = np.array([a[3] for a in assigned])
+        offsets = np.array([a[4] for a in assigned])
 
         joint_ids, _ = gripper.find_joints(spec.joint_names, preserve_order=True)
         gripper_w = matrix_from_pose7(gripper.data.root_link_pose_w.torch.cpu().double().numpy())
@@ -384,14 +398,14 @@ def main():
         writer = csv.writer(f)
         writer.writerow(['grasp', 'gripper', 'object_index', 'object_id', 'obs_index', 'label', 'success',
                          'initial_collision', 'fits', 'first_failed_phase', 'final_shift', 'final_joint',
-                         'fingers_touching'])
+                         'fingers_touching', 'back_off'])
         for env in range(num_envs):
             g = int(grasp_idx[env])
             o = int(episodes['object_index'][g])
             writer.writerow([g, args.gripper, o, episodes['objects'][o]['object_id'], int(episodes['obs_index'][g]),
                              int(episodes['label'][g]), int(success[env]), int(collided[env]), int(fits[env]),
                              first_fail[env], f'{final_shift[env]:.4f}', f'{gap[env]:.4f}',
-                             int(touching[env])])
+                             int(touching[env]), f'{offsets[env]:.3f}'])
     print(f'chunk {args.chunk}: {num_envs} grasps, success rate {success.mean():.3f} -> {args.out}')
 
 

@@ -172,6 +172,17 @@ def test_watertight_simplified_keeps_frame(tmp_path):
     assert len(out.faces) <= 2000
 
 
+def test_back_off_clears_the_object():
+    box = trimesh.creation.box(extents=(0.02, 0.02, 0.02))  # gripper part 1 cm above the root, 2 cm cube
+    halfspaces = G.convex_halfspaces([box.apply_translation((0, 0, 0.01))])
+    points = trimesh.creation.box(extents=(0.04, 0.04, 0.04)).sample(2000)
+    pose = translation(z=-0.035)  # part spans z = -0.035..-0.015 in the object frame, the cube starts at -0.02
+    moved, offset = G.back_off(pose, np.eye(4), points, halfspaces)  # more than 5 mm + 1 mm margin, 2 mm steps
+    assert np.isclose(offset, 0.008) and np.isclose(moved[2, 3], -0.043)
+    _, offset = G.back_off(pose, np.eye(4), points, halfspaces, max_offset=0.004)
+    assert np.isnan(offset)
+
+
 def test_summary():
     rows = []
     for i in range(10):
