@@ -5,7 +5,7 @@ status: active
 created: 2026-10-25
 updated: 2026-10-25
 tags: [index, state]
-related: ["[[state/architecture]]", "[[state/data-pipeline]]", "[[state/unified-datasets]]", "[[state/models]]", "[[state/training-and-evaluation]]", "[[state/configuration-and-experiments]]", "[[state/environment-and-dependencies]]", "[[state/problems]]", "[[state/ideas]]", "[[state/changelog]]"]
+related: ["[[state/architecture]]", "[[state/data-pipeline]]", "[[state/unified-datasets]]", "[[state/sim-grasp-validation]]", "[[state/models]]", "[[state/training-and-evaluation]]", "[[state/configuration-and-experiments]]", "[[state/environment-and-dependencies]]", "[[state/problems]]", "[[state/ideas]]", "[[state/changelog]]"]
 sources: [README.md, diffusion/README.md]
 ---
 
@@ -27,6 +27,7 @@ DIGNet learns a **conditional generative model of 6-DoF parallel-jaw grasps** (F
 | [[state/architecture]] | Module map and data flow from mesh to grasp |
 | [[state/data-pipeline]] | ACRONYM loading, preprocessing, representations, scaling, augmentation |
 | [[state/unified-datasets]] | ACRONYM, GraspGen and GraspNet-1Billion in one format, full vs partial clouds, converters and loader |
+| [[state/sim-grasp-validation]] | Grasp success in simulation: Isaac Lab 3 / Newton, Franka and SO-101 flying grippers |
 | [[state/models]] | Diffusion core, denoiser networks, point cloud embedders |
 | [[state/training-and-evaluation]] | Training loop, metrics, evaluation scripts |
 | [[state/configuration-and-experiments]] | Hydra configs, sweeps, what was searched |

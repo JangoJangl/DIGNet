@@ -3,7 +3,7 @@ title: Idea log
 type: idea-log
 status: active
 created: 2026-10-25
-updated: 2026-10-25
+updated: 2026-10-26
 tags: [ideas, improvements]
 related: ["[[state/problems]]", "[[research/roadmap-sim-to-real-so101]]", "[[research/grasp-generation-sota]]"]
 ---
@@ -21,7 +21,7 @@ Effort: S < 0.5 day, M 0.5 to 2 days, L 2 to 5 days. Priority reflects the goal 
 | I-05 | Stronger point cloud encoder | M | should | done 2026-10-25 (code, not yet trained) |
 | I-06 | Grasp discriminator trained on generator samples | M | must | open |
 | I-07 | Scene context and collision filtering | M | should | open |
-| I-08 | Simulation based grasp success evaluation | M | must | open |
+| I-08 | Simulation based grasp success evaluation | M | must | done 2026-10-26 (code, not yet run on a GPU) |
 | I-09 | SO-101 gripper grasp dataset from simulation | L | must | open |
 | I-10 | Reachability-aware sampling for a 5-DoF arm | M | must | open |
 | I-11 | Float32 and mixed precision | S | should | open |
@@ -70,7 +70,9 @@ Condition on (or post-filter against) the scene cloud: table plane and neighbour
 
 ## I-08 Simulation based grasp success evaluation
 
-Load the test meshes in Isaac Lab, spawn the free-floating gripper at generated grasps, close, lift and shake, record success. Thousands of parallel environments make this minutes per checkpoint. Gives the metric that matters (success rate) and labels for I-06. See [[research/simulation-isaac-lab]].
+**Implemented 2026-10-26:** `sim_eval/` with Isaac Lab 3 + Newton (no Isaac Sim), Franka and SO-101 flying grippers, see [[state/sim-grasp-validation]].
+
+Original idea: load the test meshes in Isaac Lab, spawn the free-floating gripper at generated grasps, close, lift and shake, record success. Thousands of parallel environments make this minutes per checkpoint. Gives the metric that matters (success rate) and labels for I-06. See [[research/simulation-isaac-lab]].
 
 ## I-09 SO-101 gripper grasp dataset from simulation
 

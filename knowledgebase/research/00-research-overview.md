@@ -20,7 +20,7 @@ related: ["[[research/grasp-generation-sota]]", "[[research/point-cloud-encoders
 | [[research/point-cloud-encoders]] | Which encoder should replace PointNet++ / VN-PointNet? |
 | [[research/flow-matching-se3]] | How does flow matching on SE(3) work for grasps, what is implemented, what can be optimised? |
 | [[research/pose-representations]] | Which pose representations do grasp generators and VLAs use, are poses embedded or tokenised, and should several grasps be generated jointly? |
-| [[research/simulation-isaac-lab]] | Isaac Gym vs Isaac Lab, versions, and the three ways to use simulation for grasp learning |
+| [[research/simulation-isaac-lab]] | Isaac Gym vs Isaac Lab, Isaac Lab 3 with Newton without Isaac Sim, versions, and the three ways to use simulation for grasp learning |
 | [[research/sim-to-real]] | What closes the gap between simulated point clouds and a real depth camera on a low-cost arm? |
 | [[research/lerobot-so101]] | What LeRobot and the SO-101 provide, and their constraints (5-DoF, small jaw gripper) |
 | [[research/roadmap-sim-to-real-so101]] | A concrete 2 to 10 day plan, with tiers, milestones and deliverables |
