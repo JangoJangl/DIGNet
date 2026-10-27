@@ -54,7 +54,7 @@ A video of a few grasps (headless, Newton GL via EGL, half speed, collision shap
 python -m sim_eval.export_grasps dataset --paths Thetatec/graspgen-unified-full --split validation \
     --max-objects 2 --grasps-per-object 8 --out sim_results/video/episodes.npz
 ~/robot/IsaacLab/env_isaaclab/bin/python -m sim_eval.run_newton --episodes sim_results/video/episodes.npz \
-    --gripper franka --object-root ~/objaverse --env-spacing 0.4 --out sim_results/video/franka.csv \
+    --gripper franka --object-root ~/objaverse --env-spacing 0.5 --out sim_results/video/franka.csv \
     --video sim_results/video/franka.mp4
 ```
 

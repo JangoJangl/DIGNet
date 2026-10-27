@@ -294,7 +294,7 @@ def main():
         if args.video:
             roots = gripper.data.root_link_pose_w.torch[:, :3].cpu().numpy()
             centre, size = roots.mean(axis=0), np.ptp(roots[:, :2], axis=0).max() + args.env_spacing
-            sim.set_camera_view((centre + size * np.array([0.0, -0.9, 0.6])).tolist(), centre.tolist())
+            sim.set_camera_view((centre + size * np.array([0.0, -0.75, 0.5])).tolist(), centre.tolist())
         phases = PHASES if args.protocol == 'dignet' else GRASPDATAGEN_PHASES
         for name, duration, axis in phases:
             if name == 'close':
