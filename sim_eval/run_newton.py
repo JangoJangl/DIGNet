@@ -14,6 +14,11 @@ success = 1 if the object is still between the fingers at the end (centre of mas
 the gripper since closing and the fingers did not close completely), else 0. Grasps that collide at the start
 count as 0 (--keep-colliding to judge them like the others).
 
+--protocol graspdatagen follows the simulation that produced the GraspGen labels (NVlabs/GraspDataGen,
+scripts/graspgen/grasp_sim.py): object mass 1 kg, dt 1/250 s, close 1.0 s, then 5 tugs of 0.5 s with m * g along
+[0, 0, 1], [0, ±2, 1], [±2, 0, 1] of their gripper frame (their y is the closing axis, our x), success = both
+fingers still touch the object at the end. The finger drive stays ours (their USD drive has stiffness 0).
+
   python -m sim_eval.run_newton --episodes ep.npz --gripper franka --object-root ~/objaverse --chunk 0 \
       --objects-per-chunk 16 --out results/franka_000.csv [--viz newton]
 """
@@ -63,6 +68,7 @@ parser.add_argument('--cone', choices=('pyramidal', 'elliptic'), default='ellipt
 parser.add_argument('--impratio', type=float, default=100.0,
                     help='friction to normal impedance ratio, high values stop objects creeping out along the pads')
 parser.add_argument('--keep-colliding', action='store_true')
+parser.add_argument('--protocol', choices=('dignet', 'graspdatagen'), default='dignet')
 parser.add_argument('--env-spacing', type=float, default=1.0)
 parser.add_argument('--video', default=None, help='record the run headless to this mp4 (Newton GL, half speed)')
 add_launcher_args(parser)
@@ -81,6 +87,11 @@ from sim_eval.transforms import invert, matrix_from_pose7, pose7_from_matrix  # 
 PHASES = [('settle', 0.10, None), ('close', 0.60, None)] + [
     (f'load{name}', 0.40, axis) for name, axis in (('+z', (0, 0, 1)), ('-z', (0, 0, -1)), ('+x', (1, 0, 0)),
                                                    ('-x', (-1, 0, 0)), ('+y', (0, 1, 0)), ('-y', (0, -1, 0)))]
+# GraspDataGen tugs, (x, y, z) in our gripper frame (closing axis x)
+GRASPDATAGEN_PHASES = [('close', 1.0, None)] + [
+    (f'tug{i}', 0.5, axis) for i, axis in enumerate(((0, 0, 1), (2, 0, 1), (-2, 0, 1), (0, 2, 1), (0, -2, 1)))]
+FINGER_LINKS = {'franka': ('panda_leftfinger', 'panda_rightfinger'),
+                'so101': ('gripper_link', 'moving_jaw_so101_v1_link')}
 COLLISION_SHIFT = 0.005
 HELD_SHIFT = 0.02
 GRIPPER_HEIGHT = 0.5
@@ -106,10 +117,37 @@ def object_spawn_cfg(sim_utils, prepared, friction, collision):
                           NewtonSDFCollisionCfg(sdf_max_resolution=128)]
     else:
         mesh_collision = sim_utils.UsdPhysicsMeshCollisionCfg(mesh_approximation_name='convexHull')
-    return sim_utils.MeshFileCfg(mesh=sim_utils.MeshFileCfg.TrimeshObjectCfg(mesh=prepared['mesh']),
+    # vertex/face arrays, not TrimeshObjectCfg: configclass validation recurses into the trimesh object
+    mesh = sim_utils.MeshFileCfg.TriangleMeshCfg(vertices=np.asarray(prepared['mesh'].vertices, np.float32),
+                                                 faces=np.asarray(prepared['mesh'].faces, np.int32))
+    return sim_utils.MeshFileCfg(mesh=mesh,
                                  rigid_props=sim_utils.UsdPhysicsRigidBodyCfg(), mass_props=mass,
                                  collision_props=sim_utils.UsdPhysicsCollisionCfg(),
                                  mesh_collision_props=mesh_collision, physics_material=material)
+
+
+def finger_contacts(fingers, num_envs, tol=1e-3):
+    """ [num_envs, 2] bool: finger link fingers[i] (fingers[1] may be a child of fingers[0]) touches the object """
+    from isaaclab_newton.physics import NewtonManager
+    model, contacts = NewtonManager.get_model(), NewtonManager.get_contacts()
+    body_q = matrix_from_pose7(NewtonManager.get_state_0().body_q.numpy().astype(np.float64))
+    shape_body, shape_world = model.shape_body.numpy(), model.shape_world.numpy()
+    role = np.array([1 if f'/{fingers[1]}/' in label else 0 if f'/{fingers[0]}/' in label
+                     else 2 if '/Object/' in label else -1 for label in model.shape_label])
+    n = int(contacts.rigid_contact_count.numpy()[0])
+    s0, s1 = contacts.rigid_contact_shape0.numpy()[:n], contacts.rigid_contact_shape1.numpy()[:n]
+    p0, p1 = contacts.rigid_contact_point0.numpy()[:n], contacts.rigid_contact_point1.numpy()[:n]
+    normal = contacts.rigid_contact_normal.numpy()[:n]
+    thickness = contacts.rigid_contact_margin0.numpy()[:n] + contacts.rigid_contact_margin1.numpy()[:n]
+    out = np.zeros((num_envs, 2), dtype=bool)
+    pairs = ((role[s0] == 2) & np.isin(role[s1], (0, 1))) | ((role[s1] == 2) & np.isin(role[s0], (0, 1)))
+    for c in np.flatnonzero(pairs):
+        w0 = body_q[shape_body[s0[c]]] @ np.append(p0[c], 1.0)
+        w1 = body_q[shape_body[s1[c]]] @ np.append(p1[c], 1.0)
+        if np.dot(normal[c], w1[:3] - w0[:3]) - thickness[c] <= tol:
+            finger = s0[c] if role[s1[c]] == 2 else s1[c]
+            out[shape_world[finger], role[finger]] = True
+    return out
 
 
 def env_object_assignment(scene, num_envs):
@@ -158,6 +196,8 @@ def main():
     for obj in objects:
         prepared[obj] = prepare_object(episodes['objects'][obj], args.object_root,
                                        os.path.join(args.cache_dir, 'objects'), args.collision, args.density)
+        if args.protocol == 'graspdatagen':
+            prepared[obj]['mass'] = 1.0
         idx = rows[episodes['object_index'][rows] == obj]
         poses, q_open, fits = root_poses(args.gripper, episodes['grasps'][idx], prepared[obj]['mesh'])
         grasp_rows[obj] = list(zip(idx, poses, q_open, fits))
@@ -177,7 +217,8 @@ def main():
         collision_cfg=NewtonCollisionPipelineCfg(rigid_contact_max=1000 * num_envs),
         default_shape_cfg=NewtonShapeCfg(mu=args.friction, ke=args.contact_ke, kd=args.contact_kd),
         num_substeps=args.substeps)
-    sim_cfg = sim_utils.SimulationCfg(dt=args.dt, device=args.device, gravity=(0.0, 0.0, 0.0), physics=physics,
+    dt = 1.0 / 250.0 if args.protocol == 'graspdatagen' else args.dt
+    sim_cfg = sim_utils.SimulationCfg(dt=dt, device=args.device, gravity=(0.0, 0.0, 0.0), physics=physics,
                                       physics_material=material)
     if args.video:
         from isaaclab_visualizers.newton import NewtonGLVisualizerCfg
@@ -254,7 +295,8 @@ def main():
             roots = gripper.data.root_link_pose_w.torch[:, :3].cpu().numpy()
             centre, size = roots.mean(axis=0), np.ptp(roots[:, :2], axis=0).max() + args.env_spacing
             sim.set_camera_view((centre + size * np.array([0.0, -0.9, 0.6])).tolist(), centre.tolist())
-        for name, duration, axis in PHASES:
+        phases = PHASES if args.protocol == 'dignet' else GRASPDATAGEN_PHASES
+        for name, duration, axis in phases:
             if name == 'close':
                 gripper.actuators.target_command.set_position_index(value=closed, joint_ids=joint_ids)
             if axis is not None:
@@ -280,9 +322,12 @@ def main():
 
         joint_pos = gripper.data.joint_pos.torch[:, joint_ids].cpu().numpy()
         gap = joint_pos.sum(axis=1) if args.gripper == 'franka' else joint_pos[:, 0]
-        final_shift = shifts[PHASES[-1][0]]
-        collided = shifts['initial'] > COLLISION_SHIFT
+        final_shift = shifts[phases[-1][0]]
+        collided = shifts.get('initial', np.zeros(num_envs)) > COLLISION_SHIFT
+        touching = finger_contacts(FINGER_LINKS[args.gripper], num_envs).sum(axis=1)
         held = (final_shift < HELD_SHIFT) & (gap > spec.min_closed_gap)
+        if args.protocol == 'graspdatagen':
+            held = touching == 2
         success = held & (~collided | args.keep_colliding)
         first_fail[(gap <= spec.min_closed_gap) & (first_fail == '')] = 'closed_empty'
 
@@ -295,13 +340,15 @@ def main():
     with open(args.out, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['grasp', 'gripper', 'object_index', 'object_id', 'obs_index', 'label', 'success',
-                         'initial_collision', 'fits', 'first_failed_phase', 'final_shift', 'final_joint'])
+                         'initial_collision', 'fits', 'first_failed_phase', 'final_shift', 'final_joint',
+                         'fingers_touching'])
         for env in range(num_envs):
             g = int(grasp_idx[env])
             o = int(episodes['object_index'][g])
             writer.writerow([g, args.gripper, o, episodes['objects'][o]['object_id'], int(episodes['obs_index'][g]),
                              int(episodes['label'][g]), int(success[env]), int(collided[env]), int(fits[env]),
-                             first_fail[env], f'{final_shift[env]:.4f}', f'{gap[env]:.4f}'])
+                             first_fail[env], f'{final_shift[env]:.4f}', f'{gap[env]:.4f}',
+                             int(touching[env])])
     print(f'chunk {args.chunk}: {num_envs} grasps, success rate {success.mean():.3f} -> {args.out}')
 
 
