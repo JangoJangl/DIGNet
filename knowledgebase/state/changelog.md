@@ -120,3 +120,5 @@ Code changes are uncommitted in the working tree of `main` so they can be review
 
 - `PYTHONPATH=.:diffusion pytest tests`: 12 passed on CPU (PyTorch 2.x, Python 3.13), including a train-step + sampling smoke test of `point_diffusion.Diffusion` with 2 objects x 4 grasps.
 - Not verified: a full training run on ACRONYM (no GPU or dataset available during the change). The dataloader/processor changes were checked by reading, not executed, because they need ACRONYM, Theseus and Open3D.
+
+- 2026-10-27: sim grasp validation ran on the GPU for the first time; calibration results and next levers in [[state/sim-grasp-validation]].
