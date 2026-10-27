@@ -101,13 +101,13 @@ def pad_parts(parts, n):
     return list(parts) + [(tet_v, tet_f)] * (n - len(parts))
 
 
-def write_convex_usd(parts, path, mass, visual_mesh=None, friction=1.0):
+def write_convex_usd(parts, path, mass, visual_mesh=None, friction=1.0, condim=3):
     """
     Rigid body USD with one convex-hull collider per part (UsdPhysics only, readable by Newton and PhysX):
     /Object (Xform, RigidBodyAPI, MassAPI) / collisions / part_i (Mesh, CollisionAPI, convexHull), optional
     visual mesh without collision.
     """
-    from pxr import Gf, Usd, UsdGeom, UsdPhysics, UsdShade
+    from pxr import Gf, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade
     stage = Usd.Stage.CreateNew(path)
     UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
     UsdGeom.SetStageMetersPerUnit(stage, 1.0)
@@ -135,6 +135,8 @@ def write_convex_usd(parts, path, mass, visual_mesh=None, friction=1.0):
         UsdGeom.Imageable(mesh).CreatePurposeAttr(UsdGeom.Tokens.guide)
         UsdPhysics.CollisionAPI.Apply(mesh.GetPrim())
         UsdPhysics.MeshCollisionAPI.Apply(mesh.GetPrim()).CreateApproximationAttr(UsdPhysics.Tokens.convexHull)
+        if condim != 3:  # MuJoCo contact dimension (4: torsional friction), the larger one of a pair is used
+            mesh.GetPrim().CreateAttribute('mjc:condim', Sdf.ValueTypeNames.Int).Set(int(condim))
         UsdShade.MaterialBindingAPI.Apply(mesh.GetPrim()).Bind(
             material, UsdShade.Tokens.weakerThanDescendants, 'physics')
     if visual_mesh is not None:
@@ -143,11 +145,11 @@ def write_convex_usd(parts, path, mass, visual_mesh=None, friction=1.0):
     return path
 
 
-def prepare_object(record, object_root, cache_dir, collision='coacd', density=400.0, mesh_prep='raw'):
+def prepare_object(record, object_root, cache_dir, collision='coacd', density=400.0, mesh_prep='raw', condim=3):
     """
     record: dict with mesh_file and scale. Returns dict(mesh=trimesh, mass, usd=path or None) and writes the USD
     for the coacd mode (cached by mesh file, scale and mode). mesh_prep='graspgen' simulates a watertight, decimated
-    version of the mesh (watertight_simplified).
+    version of the mesh (watertight_simplified). condim is written to the colliders of the coacd USD.
     """
     if collision not in COLLISION_MODES:
         raise ValueError(f'collision must be one of {COLLISION_MODES}')
@@ -162,8 +164,8 @@ def prepare_object(record, object_root, cache_dir, collision='coacd', density=40
     if collision == 'coacd':
         key = _cache_key(record['mesh_file'], float(record['scale']), collision if mesh_prep == 'raw' else
                          f'{collision}-{mesh_prep}')
-        usd = os.path.join(cache_dir, f'{key}.usda')
+        usd = os.path.join(cache_dir, f'{key}.usda' if condim == 3 else f'{key}-condim{condim}.usda')
         if not os.path.exists(usd):
             parts = pad_parts(coacd_parts(mesh, cache_dir, key), COACD_MAX_HULLS)
-            write_convex_usd(parts, usd, mass, visual_mesh=mesh)
+            write_convex_usd(parts, usd, mass, visual_mesh=mesh, condim=condim)
     return {'mesh': mesh, 'mass': mass, 'usd': usd}

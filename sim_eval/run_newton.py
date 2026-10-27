@@ -63,6 +63,10 @@ parser.add_argument('--substeps', type=int, default=2)
 parser.add_argument('--contact-ke', type=float, default=1e5,
                     help='contact stiffness in N/m (the Newton default 2500 lets the fingers sink in by centimetres)')
 parser.add_argument('--contact-kd', type=float, default=1e3, help='contact damping in N s/m')
+parser.add_argument('--condim', type=int, choices=(3, 4, 6), default=3,
+                    help='MuJoCo contact dimension of the object colliders (coacd): 4 adds torsional friction')
+parser.add_argument('--torsional', type=float, default=0.005,
+                    help='torsional friction coefficient in m (with --condim 4)')
 parser.add_argument('--iterations', type=int, default=100)
 parser.add_argument('--cone', choices=('pyramidal', 'elliptic'), default='elliptic')
 parser.add_argument('--impratio', type=float, default=100.0,
@@ -72,6 +76,7 @@ parser.add_argument('--mesh-prep', choices=('raw', 'graspgen'), default='raw',
                     help='graspgen: simulate a watertight, decimated mesh like the GraspGen labels (see objects.py)')
 parser.add_argument('--protocol', choices=('dignet', 'graspdatagen'), default='dignet')
 parser.add_argument('--env-spacing', type=float, default=1.0)
+parser.add_argument('--trace', default=None, help='npz with finger joints, object shift and finger contacts at 60 Hz')
 parser.add_argument('--video', default=None, help='record the run headless to this mp4 (Newton GL, half speed)')
 add_launcher_args(parser)
 args = parser.parse_args()
@@ -129,7 +134,8 @@ def object_spawn_cfg(sim_utils, prepared, friction, collision):
 
 
 def finger_contacts(fingers, num_envs, tol=1e-3):
-    """ [num_envs, 2] bool: finger link fingers[i] (fingers[1] may be a child of fingers[0]) touches the object """
+    """ [num_envs, 2] number of contacts (distance <= tol) between finger link fingers[i] and the object
+    (fingers[1] may be a child of fingers[0]) """
     from isaaclab_newton.physics import NewtonManager
     model, contacts = NewtonManager.get_model(), NewtonManager.get_contacts()
     body_q = matrix_from_pose7(NewtonManager.get_state_0().body_q.numpy().astype(np.float64))
@@ -141,14 +147,14 @@ def finger_contacts(fingers, num_envs, tol=1e-3):
     p0, p1 = contacts.rigid_contact_point0.numpy()[:n], contacts.rigid_contact_point1.numpy()[:n]
     normal = contacts.rigid_contact_normal.numpy()[:n]
     thickness = contacts.rigid_contact_margin0.numpy()[:n] + contacts.rigid_contact_margin1.numpy()[:n]
-    out = np.zeros((num_envs, 2), dtype=bool)
+    out = np.zeros((num_envs, 2), dtype=int)
     pairs = ((role[s0] == 2) & np.isin(role[s1], (0, 1))) | ((role[s1] == 2) & np.isin(role[s0], (0, 1)))
     for c in np.flatnonzero(pairs):
         w0 = body_q[shape_body[s0[c]]] @ np.append(p0[c], 1.0)
         w1 = body_q[shape_body[s1[c]]] @ np.append(p1[c], 1.0)
         if np.dot(normal[c], w1[:3] - w0[:3]) - thickness[c] <= tol:
             finger = s0[c] if role[s1[c]] == 2 else s1[c]
-            out[shape_world[finger], role[finger]] = True
+            out[shape_world[finger], role[finger]] += 1
     return out
 
 
@@ -198,7 +204,7 @@ def main():
     for obj in objects:
         prepared[obj] = prepare_object(episodes['objects'][obj], args.object_root,
                                        os.path.join(args.cache_dir, 'objects'), args.collision, args.density,
-                                       args.mesh_prep)
+                                       args.mesh_prep, args.condim)
         if args.protocol == 'graspdatagen':
             prepared[obj]['mass'] = 1.0
         idx = rows[episodes['object_index'][rows] == obj]
@@ -210,6 +216,11 @@ def main():
 
     import isaaclab.sim as sim_utils
     from isaaclab.sim.spawners.materials import RigidBodyMaterialBaseCfg
+    from isaaclab.utils import configclass
+
+    @configclass
+    class ShapeCfg(NewtonShapeCfg):
+        mu_torsional: float = 0.005  # forwarded to Newton's ShapeConfig like the declared fields
 
     material = RigidBodyMaterialBaseCfg(static_friction=args.friction, dynamic_friction=args.friction)
     physics = NewtonCfg(
@@ -218,7 +229,8 @@ def main():
                                    iterations=args.iterations, ls_iterations=50, use_mujoco_contacts=False,
                                    ccd_iterations=35),
         collision_cfg=NewtonCollisionPipelineCfg(rigid_contact_max=1000 * num_envs),
-        default_shape_cfg=NewtonShapeCfg(mu=args.friction, ke=args.contact_ke, kd=args.contact_kd),
+        default_shape_cfg=ShapeCfg(mu=args.friction, ke=args.contact_ke, kd=args.contact_kd,
+                                   mu_torsional=args.torsional),
         num_substeps=args.substeps)
     dt = 1.0 / 250.0 if args.protocol == 'graspdatagen' else args.dt
     sim_cfg = sim_utils.SimulationCfg(dt=dt, device=args.device, gravity=(0.0, 0.0, 0.0), physics=physics,
@@ -235,7 +247,7 @@ def main():
         from isaaclab.assets import ArticulationCfg, RigidObjectCfg
         from isaaclab.scene import InteractiveSceneCfg
         from isaaclab.sim import SimulationContext
-        from isaaclab.utils import configclass, instantiate
+        from isaaclab.utils import instantiate
 
         object_spawns = [object_spawn_cfg(sim_utils, prepared[o], args.friction, args.collision) for o in objects]
         drive = sim_utils.UrdfConverterCfg.JointDriveCfg(
@@ -294,11 +306,13 @@ def main():
         shifts, first_fail = {}, np.full(num_envs, '', dtype=object)
         sim_dt = sim.get_physics_dt()
         frames, frame_every = [], max(1, int(round(1.0 / (60.0 * sim_dt))))  # 60 frames per simulated second
+        trace = {'t': [], 'phase': [], 'joint': [], 'shift': [], 'contacts': []}
         if args.video:
             roots = gripper.data.root_link_pose_w.torch[:, :3].cpu().numpy()
             centre, size = roots.mean(axis=0), np.ptp(roots[:, :2], axis=0).max() + args.env_spacing
             sim.set_camera_view((centre + size * np.array([0.0, -0.75, 0.5])).tolist(), centre.tolist())
         phases = PHASES if args.protocol == 'dignet' else GRASPDATAGEN_PHASES
+        step = 0
         for name, duration, axis in phases:
             if name == 'close':
                 gripper.actuators.target_command.set_position_index(value=closed, joint_ids=joint_ids)
@@ -311,8 +325,15 @@ def main():
                 scene.write_data_to_sim()
                 sim.step()
                 scene.update(sim_dt)
+                step += 1
                 if args.video and i % frame_every == 0:
                     frames.append(sim.visualizers[0].render_rgb_array())
+                if args.trace and i % frame_every == 0:
+                    trace['t'].append(sim_dt * step)
+                    trace['phase'].append(name)
+                    trace['joint'].append(gripper.data.joint_pos.torch[:, joint_ids].cpu().numpy())
+                    trace['shift'].append(torch.linalg.norm(com() - start_com, dim=1).cpu().numpy())
+                    trace['contacts'].append(finger_contacts(FINGER_LINKS[args.gripper], num_envs))
             now = com()
             if name == 'settle':
                 shifts['initial'] = torch.linalg.norm(now - start_com, dim=1).cpu().numpy()
@@ -327,13 +348,15 @@ def main():
         gap = joint_pos.sum(axis=1) if args.gripper == 'franka' else joint_pos[:, 0]
         final_shift = shifts[phases[-1][0]]
         collided = shifts.get('initial', np.zeros(num_envs)) > COLLISION_SHIFT
-        touching = finger_contacts(FINGER_LINKS[args.gripper], num_envs).sum(axis=1)
+        touching = (finger_contacts(FINGER_LINKS[args.gripper], num_envs) > 0).sum(axis=1)
         held = (final_shift < HELD_SHIFT) & (gap > spec.min_closed_gap)
         if args.protocol == 'graspdatagen':
             held = touching == 2
         success = held & (~collided | args.keep_colliding)
         first_fail[(gap <= spec.min_closed_gap) & (first_fail == '')] = 'closed_empty'
 
+        if args.trace:
+            np.savez(args.trace, grasp=grasp_idx, **{k: np.asarray(v) for k, v in trace.items()})
         if args.video:
             import imageio
             os.makedirs(os.path.dirname(os.path.abspath(args.video)), exist_ok=True)
