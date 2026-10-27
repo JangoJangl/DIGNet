@@ -32,30 +32,42 @@ def watertight_simplified(mesh, cache_dir, key, voxels=128, max_faces=5000):
     Watertight, decimated version of a mesh, the kind of mesh the GraspGen labels were simulated on
     (GraspGen download_objects.py --simplify: Manifold, then simplify). Approximated without these tools: the surface
     is voxelized (voxels along the longest side), enclosed space is filled, the boundary is extracted with marching
-    cubes and decimated to max_faces. Open shells become walls of about one voxel. Cached as npz.
+    cubes and decimated to max_faces. Open shells become walls of about one voxel. The volume of the filled voxels
+    is kept in metadata['solid_volume']. Cached as npz.
     """
     path = os.path.join(cache_dir, f'{key}.npz')
     import trimesh
     if os.path.exists(path):
         data = np.load(path)
-        return trimesh.Trimesh(data['vertices'], data['faces'])
+        if 'solid_volume' in data:
+            out = trimesh.Trimesh(data['vertices'], data['faces'])
+            out.metadata['solid_volume'] = float(data['solid_volume'])
+            return out
     pitch = mesh.extents.max() / voxels
     grid = mesh.voxelized(pitch).fill()
+    solid_volume = float(grid.filled_count * pitch ** 3)
     out = grid.marching_cubes.apply_transform(grid.transform)  # marching cubes are in voxel indices
     if len(out.faces) > max_faces:
         import fast_simplification
         v, f = fast_simplification.simplify(out.vertices, out.faces, target_reduction=1.0 - max_faces / len(out.faces))
         out = trimesh.Trimesh(v, f)
     out.fix_normals()
+    out.metadata['solid_volume'] = solid_volume
     os.makedirs(cache_dir, exist_ok=True)
-    np.savez(path, vertices=np.asarray(out.vertices, np.float64), faces=np.asarray(out.faces, np.int64))
+    np.savez(path, vertices=np.asarray(out.vertices, np.float64), faces=np.asarray(out.faces, np.int64),
+             solid_volume=solid_volume)
     return out
 
 
-def object_mass(mesh, density=400.0, min_mass=0.02, max_mass=1.0):
-    """ mass from the volume (convex hull volume for open meshes), clipped to what the grippers are meant for """
-    volume = mesh.volume if mesh.is_watertight and mesh.volume > 0 else mesh.convex_hull.volume
-    return float(np.clip(density * volume, min_mass, max_mass))
+def object_mass(mesh, density=400.0, min_mass=0.02, max_mass=0.5, solid_volume=None, shell=0.003):
+    """
+    mass from the solid volume (filled voxels of watertight_simplified, or the volume of a watertight mesh), at least
+    that of a shell of the surface area with thickness `shell` (open and thin meshes), clipped to what the grippers
+    are meant for. (The convex hull made flat and hollow objects far too heavy.)
+    """
+    if solid_volume is None:
+        solid_volume = mesh.volume if mesh.is_watertight and mesh.volume > 0 else 0.0
+    return float(np.clip(density * max(solid_volume, mesh.area * shell), min_mass, max_mass))
 
 
 def _cache_key(mesh_file, scale, mode):
@@ -156,10 +168,11 @@ def prepare_object(record, object_root, cache_dir, collision='coacd', density=40
     if mesh_prep not in MESH_PREPS:
         raise ValueError(f'mesh_prep must be one of {MESH_PREPS}')
     mesh = load_mesh(object_root, record['mesh_file'], float(record['scale']))
+    key = _cache_key(record['mesh_file'], float(record['scale']), 'graspgen')
+    prepared = watertight_simplified(mesh, cache_dir, key)
+    mass = object_mass(mesh, density, solid_volume=prepared.metadata['solid_volume'])
     if mesh_prep == 'graspgen':
-        key = _cache_key(record['mesh_file'], float(record['scale']), mesh_prep)
-        mesh = watertight_simplified(mesh, cache_dir, key)
-    mass = object_mass(mesh, density)
+        mesh = prepared
     usd = None
     if collision == 'coacd':
         key = _cache_key(record['mesh_file'], float(record['scale']), collision if mesh_prep == 'raw' else

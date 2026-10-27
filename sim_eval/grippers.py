@@ -53,14 +53,19 @@ class GripperSpec:
     min_closed_gap: float       # joint value (sum for franka) below which the gripper closed on nothing
     root_to_tcp: np.ndarray = field(repr=False)  # tcp frame (approach z, closing x) in the root link frame
     urdf: str = ''
+    close_speed: float = 0.0    # the closing target moves at this speed (m/s or rad/s), 0: it jumps to closed
 
 
 def franka_spec(effort_limit=70.0):
-    """ Franka Hand: 70 N continuous grasp force, fingers 0..0.04 m each """
+    """
+    Franka Hand: 70 N continuous grasp force, fingers 0..0.04 m each. The closing target moves at 0.1 m/s to beyond
+    closed, so the grip force reaches the effort limit for thin objects too (higher stiffness is unstable with the
+    15 g fingers at dt 1/240 s).
+    """
     return GripperSpec(name='franka', joint_names=['panda_finger_joint1', 'panda_finger_joint2'],
                        open_pos=[0.04, 0.04], closed_target=[0.0, 0.0], effort_limit=effort_limit,
-                       stiffness=2000.0, damping=100.0, min_closed_gap=0.002,
-                       root_to_tcp=translation(z=PANDA_TCP_DEPTH))
+                       stiffness=3000.0, damping=100.0, min_closed_gap=0.002,
+                       root_to_tcp=translation(z=PANDA_TCP_DEPTH), close_speed=0.1)
 
 
 def so101_spec(effort_limit=1.5):

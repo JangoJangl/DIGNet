@@ -2,11 +2,12 @@
 Executes grasps of an episode file with a flying gripper in Isaac Lab 3 on the Newton (MuJoCo-Warp) backend.
 Isaac Sim is not needed (kit-less Isaac Lab, see sim_eval/README.md).
 
-One environment per grasp. The gripper root is fixed in its environment and the object is placed relative to it,
-so that the gripper is at the grasp pose. Gravity is off; instead the test applies an inertial load to the object:
+One environment per grasp. The gripper root is fixed in its environment (approach axis pointing down) and the object
+is placed relative to it, so that the gripper is at the grasp pose. Gravity is off; instead the test applies an inertial load to the object:
 
   settle  0.10 s  fingers open, no load. The object moving more than 5 mm means the open gripper collides with it
-  close   0.60 s  position target "closed" with limited effort (Franka 70 N per finger, SO-101 1.5 N m)
+  close   0.60 s  position target "closed" with limited effort (Franka 70 N per finger, target moving at 0.1 m/s;
+                  SO-101 1.5 N m)
   load    6 x 0.40 s  force m * g * load_g along +z, -z, +x, -x, +y, -y of the gripper (pull out, push in, along
           the closing axis and along the pads): equivalent to lifting and shaking the gripper with that acceleration
 
@@ -57,6 +58,10 @@ parser.add_argument('--collision', choices=('coacd', 'convex_hull', 'sdf'), defa
 parser.add_argument('--friction', type=float, default=1.0)
 parser.add_argument('--density', type=float, default=400.0, help='object density in kg/m^3 (mass clipped to 0.02..1 kg)')
 parser.add_argument('--effort', type=float, default=None, help='grasp effort (N per finger / N m), default per gripper')
+parser.add_argument('--stiffness', type=float, default=None, help='finger drive stiffness, default per gripper')
+parser.add_argument('--close-speed', type=float, default=None,
+                    help='closing speed of the position target (m/s or rad/s per finger, 0: jump), default per gripper')
+parser.add_argument('--mass', type=float, default=None, help='the same object mass in kg for all objects')
 parser.add_argument('--load-g', type=float, default=1.0, help='load as a multiple of g')
 parser.add_argument('--dt', type=float, default=1.0 / 240.0)
 parser.add_argument('--substeps', type=int, default=2)
@@ -102,6 +107,7 @@ FINGER_LINKS = {'franka': ('panda_leftfinger', 'panda_rightfinger'),
 COLLISION_SHIFT = 0.005
 HELD_SHIFT = 0.02
 GRIPPER_HEIGHT = 0.5
+GRIPPER_ROT = (1.0, 0.0, 0.0, 0.0)  # x, y, z, w: approach axis pointing down (no gravity, only for the view)
 
 
 def chunk_episodes(episodes, chunk, per_chunk):
@@ -191,6 +197,10 @@ def main():
         print(f'chunk {args.chunk} is empty')
         return
     spec = SPECS[args.gripper]() if args.effort is None else SPECS[args.gripper](effort_limit=args.effort)
+    if args.stiffness is not None:
+        spec.stiffness = args.stiffness
+    if args.close_speed is not None:
+        spec.close_speed = args.close_speed
     asset_dir = os.path.join(args.cache_dir, 'grippers')
     if args.gripper == 'franka':
         urdf = franka_urdf(asset_dir)
@@ -205,8 +215,8 @@ def main():
         prepared[obj] = prepare_object(episodes['objects'][obj], args.object_root,
                                        os.path.join(args.cache_dir, 'objects'), args.collision, args.density,
                                        args.mesh_prep, args.condim)
-        if args.protocol == 'graspdatagen':
-            prepared[obj]['mass'] = 1.0
+        if args.protocol == 'graspdatagen' or args.mass is not None:
+            prepared[obj]['mass'] = 1.0 if args.mass is None else args.mass
         idx = rows[episodes['object_index'][rows] == obj]
         poses, q_open, fits = root_poses(args.gripper, episodes['grasps'][idx], prepared[obj]['mesh'])
         grasp_rows[obj] = list(zip(idx, poses, q_open, fits))
@@ -260,7 +270,7 @@ def main():
                 spawn=sim_utils.UrdfFileCfg(
                     asset_path=urdf, usd_dir=os.path.join(asset_dir, 'usd'), fix_base=True, joint_drive=drive,
                     physics_material=material),
-                init_state=ArticulationCfg.InitialStateCfg(pos=(0.0, 0.0, GRIPPER_HEIGHT), rot=(0.0, 0.0, 0.0, 1.0),
+                init_state=ArticulationCfg.InitialStateCfg(pos=(0.0, 0.0, GRIPPER_HEIGHT), rot=GRIPPER_ROT,
                                                            joint_pos=dict(zip(spec.joint_names, spec.open_pos))),
                 actuators={'fingers': ImplicitActuatorCfg(joint_names_expr=spec.joint_names, stiffness=spec.stiffness,
                                                           damping=spec.damping, joint_effort_limit=spec.effort_limit)})
@@ -309,8 +319,9 @@ def main():
         trace = {'t': [], 'phase': [], 'joint': [], 'shift': [], 'contacts': []}
         if args.video:
             roots = gripper.data.root_link_pose_w.torch[:, :3].cpu().numpy()
-            centre, size = roots.mean(axis=0), np.ptp(roots[:, :2], axis=0).max() + args.env_spacing
-            sim.set_camera_view((centre + size * np.array([0.0, -0.75, 0.5])).tolist(), centre.tolist())
+            centre = roots.mean(axis=0) - [0.0, 0.0, 0.1]  # the grasps are 0.1 m below the gripper roots
+            size = np.ptp(roots[:, :2], axis=0).max() + args.env_spacing
+            sim.set_camera_view((centre + size * np.array([0.45, -0.75, 0.15])).tolist(), centre.tolist())
         phases = PHASES if args.protocol == 'dignet' else GRASPDATAGEN_PHASES
         step = 0
         for name, duration, axis in phases:
@@ -322,6 +333,12 @@ def main():
                 obj.permanent_wrench_composer.set_forces_and_torques_index(
                     forces=force[:, None, :], torques=torch.zeros_like(force)[:, None, :], is_global=True)
             for i in range(max(1, int(round(duration / sim_dt)))):
+                if name == 'close' and spec.close_speed > 0:
+                    # the target moves from the opening to effort / stiffness beyond closed, so that the grip force
+                    # reaches the effort limit whatever the object width (joints close towards smaller values)
+                    target = torch.maximum(closed - spec.effort_limit / max(spec.stiffness, 1e-6),
+                                           q_open_t - spec.close_speed * sim_dt * (i + 1))
+                    gripper.actuators.target_command.set_position_index(value=target, joint_ids=joint_ids)
                 scene.write_data_to_sim()
                 sim.step()
                 scene.update(sim_dt)

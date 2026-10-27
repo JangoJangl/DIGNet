@@ -63,11 +63,27 @@ Things to tune if they are off: `--friction`, `--effort`, `--load-g`, `--collisi
 `--dt`, `--substeps`, `--contact-ke/--contact-kd`, `--cone`, `--impratio`. With `use_mujoco_contacts=False` MJWarp takes
 the shape `ke`/`kd` as contact stiffness/damping in N/m; Newton's default `ke = 2500` lets the fingers sink in by
 centimetres at 70 N, hence `--contact-ke 1e5`. A pyramidal cone or a low `impratio` lets the objects creep out along
-the pads (defaults: elliptic, 100). `--mesh-prep graspgen` simulates watertight, decimated meshes like the ones the GraspGen
-labels were made on (approximated with voxelization + marching cubes + fast-simplification instead of the Manifold
-tools; needs scikit-image). On the 8 calibration objects it changed little (label 1 / label 0 success 44/23 % raw,
-41/24 % coacd and 42/21 % sdf on prepared meshes); the failures concentrate on a few objects (thin sheets). Use `--objects-per-chunk` to fit the GPU memory (6 GB:
-start with 8 objects x 32 grasps = 256 environments).
+the pads (defaults: elliptic, 100). Object mass: density (400 kg/m³) x solid volume of the voxel-filled mesh, at least a 3 mm shell of the surface
+(open/thin meshes), clipped to 0.02..0.5 kg; `--mass` sets one mass for all objects. The Franka closing target moves
+at 0.1 m/s to beyond closed (stiffness 3000 N/m), so the grip force reaches 70 N for thin objects too (with a
+position target at closed the force was stiffness x remaining gap, ~5 N on a 5 mm plate; stiffness >= 1e4 is
+unstable with the 15 g fingers). `--mesh-prep graspgen` simulates watertight, decimated meshes like the ones the
+GraspGen labels were made on (voxelization + marching cubes + fast-simplification instead of the Manifold tools).
+
+Calibration, Franka, 8 validation objects x 32 dataset grasps (success of label-1 / label-0 grasps, agreement):
+
+| variant | label 1 | label 0 | agreement |
+|---|---|---|---|
+| hull mass (<= 1 kg), stiffness 2000, target jumps to closed | 44 % | 23 % | 0.60 |
+| new mass, stiffness 2000 | 53 % | 26 % | 0.63 |
+| uniform 0.2 kg, stiffness 2000 | 47 % | 22 % | 0.62 |
+| **new mass, stiffness 3000, ramp 0.1 m/s (default)** | 51-53 % | 20 % | 0.65-0.66 |
+| uniform 0.2 kg, stiffness 3000, ramp | 41 % | 13 % | 0.63 |
+| new mass, stiffness 2000, mesh-prep graspgen + sdf | 54 % | 30 % | 0.62 |
+| new mass, stiffness 3000, ramp, mesh-prep graspgen + sdf | 47 % | 30 % | 0.58 |
+| stiffness 1e5, ramp (unstable) | 0 % | 0 % | 0.48 |
+
+SO-101 with the defaults: 6 % / 8 %, 43 % of the grasps collide at the start (wrist and servo body).
 
 ## 3. Evaluate a checkpoint
 
