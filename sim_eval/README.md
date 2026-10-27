@@ -16,14 +16,22 @@ CUDA GPU from Turing on (RTX 3060 is fine) and driver >= 580.65; the Isaac Sim V
 ```bash
 git clone -b v3.0.0 https://github.com/isaac-sim/IsaacLab.git ~/robot/IsaacLab && cd ~/robot/IsaacLab
 uv venv --python 3.12 --seed env_isaaclab && source env_isaaclab/bin/activate
+uv pip install cmake                   # otherwise isaaclab.sh wants 'sudo apt-get install cmake'
 ./isaaclab.sh -i                       # default install: Newton, no Isaac Sim
-# URDF import without Isaac Sim needs the 'importers' extra, follow the install guide's
-# "importers" section (it pins overrides so the base install is not downgraded)
-uv pip install trimesh coacd fast-simplification rtree huggingface_hub wandb
+# URDF import without Isaac Sim: the 'importers' extra, with the overrides so the base install is not downgraded
+uv pip install "isaacsim-asset-isolated==6.2.0.0" "tinyobjloader==2.0.0rc13" \
+    --overrides tools/wheel_builder/uv-overrides.txt --extra-index-url https://pypi.nvidia.com \
+    --index-strategy unsafe-best-match
+uv pip install trimesh coacd fast-simplification rtree huggingface_hub wandb imageio imageio-ffmpeg pytest
 ```
 
-Check: `python scripts/tutorials/00_sim/create_empty.py` runs without Isaac Sim. On a crash while loading the stage
-(OpenUSD < 26.05 with many colliders per body) set `PXR_WORK_THREAD_LIMIT=1`.
+Do not install `usd-core`: `usd-exchange` (pulled in by Isaac Lab) ships its own `pxr` and both overwrite each other's
+files (`import usdex.core` then fails with "initialization failed"; fix: `uv pip uninstall usd-core` and
+`uv pip install --reinstall usd-exchange==3.0.1`). `scripts/tutorials/00_sim/create_empty.py` is no check here, it uses
+PhysX and asks for Isaac Sim; run a small chunk of `run_newton.py` instead. `run_newton.py` puts the importer's PhysX
+schemas on `PXR_PLUGINPATH_NAME` itself (without it the URDF import fails with "Cannot find a valid schema for
+PhysxJointAPI"). On a crash while loading the stage (OpenUSD < 26.05 with many colliders per body) set
+`PXR_WORK_THREAD_LIMIT=1`.
 
 Also needed: the Objaverse meshes of the GraspGen objects (`mesh_file` in the dataset is relative to this root,
 same as for `dataset_tools`) and the SO-101 model `SO-ARM100/Simulation/SO101` (URDF + STL).
@@ -37,12 +45,25 @@ grasps shows whether contact, friction and effort are set sensibly:
 python -m sim_eval.export_grasps dataset --paths Thetatec/graspgen-unified-full --split validation \
     --max-objects 16 --grasps-per-object 32 --out sim_results/gt/episodes.npz
 python -m sim_eval.evaluate --episodes sim_results/gt/episodes.npz --grippers franka \
-    --object-root ~/objaverse --out-dir sim_results/gt -- --viz newton
+    --object-root ~/objaverse --out-dir sim_results/gt --python ~/robot/IsaacLab/env_isaaclab/bin/python
+```
+
+A video of a few grasps (headless, Newton GL via EGL, half speed, collision shapes are shown):
+
+```bash
+python -m sim_eval.export_grasps dataset --paths Thetatec/graspgen-unified-full --split validation \
+    --max-objects 2 --grasps-per-object 8 --out sim_results/video/episodes.npz
+~/robot/IsaacLab/env_isaaclab/bin/python -m sim_eval.run_newton --episodes sim_results/video/episodes.npz \
+    --gripper franka --object-root ~/objaverse --env-spacing 0.4 --out sim_results/video/franka.csv \
+    --video sim_results/video/franka.mp4
 ```
 
 `summary.json` then has `success_pos` (should be high) and `success_neg` (should be low) for the Franka.
 Things to tune if they are off: `--friction`, `--effort`, `--load-g`, `--collision coacd|sdf|convex_hull`,
-`--dt`, `--substeps`, `--cone elliptic --impratio 10`. Use `--objects-per-chunk` to fit the GPU memory (6 GB:
+`--dt`, `--substeps`, `--contact-ke/--contact-kd`, `--cone`, `--impratio`. With `use_mujoco_contacts=False` MJWarp takes
+the shape `ke`/`kd` as contact stiffness/damping in N/m; Newton's default `ke = 2500` lets the fingers sink in by
+centimetres at 70 N, hence `--contact-ke 1e5`. A pyramidal cone or a low `impratio` lets the objects creep out along
+the pads (defaults: elliptic, 100). Use `--objects-per-chunk` to fit the GPU memory (6 GB:
 start with 8 objects x 32 grasps = 256 environments).
 
 ## 3. Evaluate a checkpoint

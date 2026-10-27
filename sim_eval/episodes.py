@@ -13,11 +13,13 @@ Every object has the same number of grasps (grasps_per_object), so one simulatio
 n * grasps_per_object environments in contiguous blocks (see run_newton.py).
 """
 import json
+import os
 
 import numpy as np
 
 
 def save_episodes(path, grasps, object_index, label, obs_index, objects, observations, meta):
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     np.savez_compressed(path, grasps=np.asarray(grasps, np.float32), object_index=np.asarray(object_index, np.int32),
                         label=np.asarray(label, np.int8), obs_index=np.asarray(obs_index, np.int32),
                         objects=json.dumps(objects), observations=json.dumps(observations), meta=json.dumps(meta))

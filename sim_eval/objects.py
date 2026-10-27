@@ -12,6 +12,7 @@ import os
 import numpy as np
 
 COLLISION_MODES = ('coacd', 'convex_hull', 'sdf')
+COACD_MAX_HULLS = 24
 
 
 def load_mesh(object_root, mesh_file, scale):
@@ -35,7 +36,7 @@ def _cache_key(mesh_file, scale, mode):
     return hashlib.md5(f'{mesh_file}|{scale:.6f}|{mode}'.encode()).hexdigest()[:16]
 
 
-def coacd_parts(mesh, cache_dir, key, threshold=0.05, max_hulls=24, max_faces=20000):
+def coacd_parts(mesh, cache_dir, key, threshold=0.05, max_hulls=COACD_MAX_HULLS, max_faces=20000):
     """ convex parts (list of (vertices, faces)) of a mesh, cached as npz """
     path = os.path.join(cache_dir, f'{key}.npz')
     if os.path.exists(path):
@@ -61,6 +62,17 @@ def coacd_parts(mesh, cache_dir, key, threshold=0.05, max_hulls=24, max_faces=20
         arrays[f'v{i}'], arrays[f'f{i}'] = v, f
     np.savez(path, **arrays)
     return parts
+
+
+def pad_parts(parts, n):
+    """
+    Pads a convex decomposition to n parts with 1 mm tetrahedra at the centre of the largest part (inside the object).
+    Newton's views need the same number of shapes in every world, so all objects of a chunk get n parts.
+    """
+    v, _ = max(parts, key=lambda p: np.ptp(p[0], axis=0).prod())
+    tet_v = (v.mean(axis=0) + 0.001 * np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]])).astype(np.float32)
+    tet_f = np.array([[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]], np.int32)
+    return list(parts) + [(tet_v, tet_f)] * (n - len(parts))
 
 
 def write_convex_usd(parts, path, mass, visual_mesh=None, friction=1.0):
@@ -119,6 +131,6 @@ def prepare_object(record, object_root, cache_dir, collision='coacd', density=40
         key = _cache_key(record['mesh_file'], float(record['scale']), collision)
         usd = os.path.join(cache_dir, f'{key}.usda')
         if not os.path.exists(usd):
-            parts = coacd_parts(mesh, cache_dir, key)
+            parts = pad_parts(coacd_parts(mesh, cache_dir, key), COACD_MAX_HULLS)
             write_convex_usd(parts, usd, mass, visual_mesh=mesh)
     return {'mesh': mesh, 'mass': mass, 'usd': usd}

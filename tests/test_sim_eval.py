@@ -150,6 +150,17 @@ def test_convex_usd(tmp_path):
     assert not stage.GetPrimAtPath('/Object/visual').HasAPI(UsdPhysics.CollisionAPI)
 
 
+def test_pad_parts_keeps_padding_inside():
+    from sim_eval.objects import pad_parts
+    box = trimesh.creation.box(extents=(0.04, 0.02, 0.02))
+    small = trimesh.creation.box(extents=(0.01, 0.01, 0.01))
+    parts = [(box.vertices, box.faces), (small.vertices + [0.03, 0, 0], small.faces)]
+    padded = pad_parts(parts, 5)
+    assert len(padded) == 5 and padded[:2] == parts
+    for v, f in padded[2:]:
+        assert box.contains(v).all() and trimesh.Trimesh(v, f).volume > 0
+
+
 def test_summary():
     rows = []
     for i in range(10):

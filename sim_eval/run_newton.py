@@ -25,6 +25,17 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 
+# Kit-less URDF import: the importer registers its PhysX schemas only when it is imported, after Isaac Lab has built
+# the USD schema registry ('Cannot find a valid schema for PhysxJointAPI'). OpenUSD reads this path when it builds it.
+import importlib.util  # noqa: E402
+_isaacsim = importlib.util.find_spec('isaacsim')
+if _isaacsim is not None:
+    for _root in _isaacsim.submodule_search_locations:
+        _schemas = os.path.join(_root, 'asset', 'importer', 'utils', 'impl', 'schemas')
+        if os.path.isdir(_schemas):
+            _path = os.environ.get('PXR_PLUGINPATH_NAME')
+            os.environ['PXR_PLUGINPATH_NAME'] = os.pathsep.join(filter(None, (_path, _schemas)))
+
 from isaaclab.app import add_launcher_args, launch_simulation  # noqa: E402
 
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -44,12 +55,21 @@ parser.add_argument('--effort', type=float, default=None, help='grasp effort (N 
 parser.add_argument('--load-g', type=float, default=1.0, help='load as a multiple of g')
 parser.add_argument('--dt', type=float, default=1.0 / 240.0)
 parser.add_argument('--substeps', type=int, default=2)
+parser.add_argument('--contact-ke', type=float, default=1e5,
+                    help='contact stiffness in N/m (the Newton default 2500 lets the fingers sink in by centimetres)')
+parser.add_argument('--contact-kd', type=float, default=1e3, help='contact damping in N s/m')
 parser.add_argument('--iterations', type=int, default=100)
-parser.add_argument('--cone', choices=('pyramidal', 'elliptic'), default='pyramidal')
-parser.add_argument('--impratio', type=float, default=1.0)
+parser.add_argument('--cone', choices=('pyramidal', 'elliptic'), default='elliptic')
+parser.add_argument('--impratio', type=float, default=100.0,
+                    help='friction to normal impedance ratio, high values stop objects creeping out along the pads')
 parser.add_argument('--keep-colliding', action='store_true')
+parser.add_argument('--env-spacing', type=float, default=1.0)
+parser.add_argument('--video', default=None, help='record the run headless to this mp4 (Newton GL, half speed)')
 add_launcher_args(parser)
 args = parser.parse_args()
+if args.video:  # EGL offscreen rendering also when a display is set (pyglet decides at import)
+    import pyglet
+    pyglet.options['headless'] = True
 
 import numpy as np  # noqa: E402
 
@@ -92,9 +112,11 @@ def object_spawn_cfg(sim_utils, prepared, friction, collision):
                                  mesh_collision_props=mesh_collision, physics_material=material)
 
 
-def env_object_assignment(scene, object_spawns, num_envs):
+def env_object_assignment(scene, num_envs):
     """ chunk-local object index of every environment, read from the clone plan of the scene """
     plan = scene.clone_plan
+    spawn = scene.cfg.object.spawn  # the scene's copy of the config, the plan refers to its spawners
+    object_spawns = getattr(spawn, 'assets_cfg', None) or [spawn]
     ids = {id(cfg): i for i, cfg in enumerate(object_spawns)}
     topo = plan.topology
     layout, members, starts = (np.asarray(topo.world_prototype_layout), np.asarray(topo.world_prototypes),
@@ -148,15 +170,19 @@ def main():
 
     material = RigidBodyMaterialBaseCfg(static_friction=args.friction, dynamic_friction=args.friction)
     physics = NewtonCfg(
-        solver_cfg=MJWarpSolverCfg(solver='newton', integrator='implicitfast', njmax=300, nconmax=200,
+        solver_cfg=MJWarpSolverCfg(solver='newton', integrator='implicitfast', njmax=1200, nconmax=300,
                                    impratio=args.impratio, cone=args.cone, update_data_interval=1,
                                    iterations=args.iterations, ls_iterations=50, use_mujoco_contacts=False,
                                    ccd_iterations=35),
         collision_cfg=NewtonCollisionPipelineCfg(rigid_contact_max=1000 * num_envs),
-        default_shape_cfg=NewtonShapeCfg(mu=args.friction),
+        default_shape_cfg=NewtonShapeCfg(mu=args.friction, ke=args.contact_ke, kd=args.contact_kd),
         num_substeps=args.substeps)
     sim_cfg = sim_utils.SimulationCfg(dt=args.dt, device=args.device, gravity=(0.0, 0.0, 0.0), physics=physics,
                                       physics_material=material)
+    if args.video:
+        from isaaclab_visualizers.newton import NewtonGLVisualizerCfg
+        sim_cfg.visualizer_cfgs = NewtonGLVisualizerCfg(headless=True, window_width=1280, window_height=720,
+                                                        enable_picking=False, show_collision=True)
 
     with launch_simulation(sim_cfg, args):
         import torch
@@ -190,13 +216,13 @@ def main():
 
         sim = SimulationContext(sim_cfg)
         sim.set_camera_view([1.0, 1.0, 1.2], [0.0, 0.0, GRIPPER_HEIGHT])
-        scene = instantiate(GraspSceneCfg(num_envs=num_envs, env_spacing=1.0, replicate_physics=True))
+        scene = instantiate(GraspSceneCfg(num_envs=num_envs, env_spacing=args.env_spacing, replicate_physics=True))
         sim.reset()
         gripper, obj = scene['gripper'], scene['object']
         device = sim.device
 
         # grasp of every environment: the next unused grasp of the object the environment got
-        env_obj = env_object_assignment(scene, object_spawns, num_envs)
+        env_obj = env_object_assignment(scene, num_envs)
         queues = {i: list(grasp_rows[o]) for i, o in enumerate(objects)}
         assigned = [queues[i].pop(0) for i in env_obj]
         grasp_idx = np.array([a[0] for a in assigned])
@@ -217,14 +243,17 @@ def main():
         gripper.write_joint_velocity_to_sim_index(velocity=torch.zeros_like(q_open_t), joint_ids=joint_ids)
         gripper.actuators.target_command.set_position_index(value=q_open_t, joint_ids=joint_ids)
         scene.reset()
-
         mass = obj.data.body_mass.torch.reshape(num_envs, -1)[:, :1].to(torch.float32)
         closed = torch.tensor(spec.closed_target, dtype=torch.float32, device=device).expand(num_envs, -1)
         com = lambda: obj.data.root_com_pose_w.torch[:, :3].clone()  # noqa: E731
         start_com, ref_com = com(), None
         shifts, first_fail = {}, np.full(num_envs, '', dtype=object)
         sim_dt = sim.get_physics_dt()
-
+        frames, frame_every = [], max(1, int(round(1.0 / (60.0 * sim_dt))))  # 60 frames per simulated second
+        if args.video:
+            roots = gripper.data.root_link_pose_w.torch[:, :3].cpu().numpy()
+            centre, size = roots.mean(axis=0), np.ptp(roots[:, :2], axis=0).max() + args.env_spacing
+            sim.set_camera_view((centre + size * np.array([0.0, -0.9, 0.6])).tolist(), centre.tolist())
         for name, duration, axis in PHASES:
             if name == 'close':
                 gripper.actuators.target_command.set_position_index(value=closed, joint_ids=joint_ids)
@@ -233,10 +262,12 @@ def main():
                 force = (mass * 9.81 * args.load_g) * direction
                 obj.permanent_wrench_composer.set_forces_and_torques_index(
                     forces=force[:, None, :], torques=torch.zeros_like(force)[:, None, :], is_global=True)
-            for _ in range(max(1, int(round(duration / sim_dt)))):
+            for i in range(max(1, int(round(duration / sim_dt)))):
                 scene.write_data_to_sim()
                 sim.step()
                 scene.update(sim_dt)
+                if args.video and i % frame_every == 0:
+                    frames.append(sim.visualizers[0].render_rgb_array())
             now = com()
             if name == 'settle':
                 shifts['initial'] = torch.linalg.norm(now - start_com, dim=1).cpu().numpy()
@@ -254,6 +285,11 @@ def main():
         held = (final_shift < HELD_SHIFT) & (gap > spec.min_closed_gap)
         success = held & (~collided | args.keep_colliding)
         first_fail[(gap <= spec.min_closed_gap) & (first_fail == '')] = 'closed_empty'
+
+        if args.video:
+            import imageio
+            os.makedirs(os.path.dirname(os.path.abspath(args.video)), exist_ok=True)
+            imageio.mimwrite(args.video, frames, fps=30, macro_block_size=1)
 
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, 'w', newline='') as f:
